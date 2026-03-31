@@ -1,0 +1,18 @@
+Steps
+
+actually to run this application.. you need to have node js installed in your system i.e; latest version which is available (24)
+then
+open the project path in a terminal..
+for example my path : C:\Users\abhin_xj0fp6r\Documents\capstone\Mattr AI\Crop Advisor
+then move to the my_backend folder
+cd my_backend
+python backend_api.py
+
+backend will start..!!
+
+then move to the frontend folder
+cd frontend
+npm install
+npm run dev
+
+
