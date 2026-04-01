@@ -9,9 +9,8 @@ import pandas as pd
 app = Flask(__name__)
 CORS(app)  # Allow React to talk to Python
 
-# ============================================================
-# 1. LOAD MODEL FILES (Generated from your .ipynb notebook)
-# ============================================================
+# 1. LOAD MODEL FILES
+
 try:
     model = joblib.load("model.pkl")
     encoder = joblib.load("label_encoder.pkl")
@@ -53,7 +52,6 @@ district_soil_data = {
 
 # ============================================================
 # 3. CROP INFO DATABASE
-#    Full bilingual data so the React frontend never crashes.
 # ============================================================
 crop_info = {
     "Paddy": {
@@ -104,30 +102,18 @@ crop_info = {
         "consHi": ["जलभराव के प्रति संवेदनशील", "अनाज की तुलना में कम उपज"],
         "imageUrl": "https://images.unsplash.com/photo-1515543904379-3d757afe72e4?auto=format&fit=crop&q=80&w=800",
     },
-    "Vegetables": {
-        "nameHi": "सब्जियां",
-        "description": "High-value short-duration crops with quick market returns, suited for diverse soil types.",
-        "descriptionHi": "उच्च मूल्य वाली कम अवधि की फसलें जो जल्दी बाजार में आती हैं और विभिन्न मिट्टी के लिए उपयुक्त हैं।",
-        "maintenance": "Requires frequent irrigation, integrated pest management, and organic compost for best yield.",
-        "maintenanceHi": "बेहतर उपज के लिए बार-बार सिंचाई, एकीकृत कीट प्रबंधन और जैविक खाद की जरूरत है।",
-        "pros": ["High market value per acre", "Multiple quick harvest cycles per year", "Diverse crop options (tomato, brinjal, etc.)"],
-        "prosHi": ["प्रति एकड़ उच्च बाजार मूल्य", "प्रति वर्ष कई त्वरित फसल चक्र", "विविध फसल विकल्प (टमाटर, बैंगन आदि)"],
-        "cons": ["Highly perishable — needs quick market access", "High labor input required"],
-        "consHi": ["जल्दी खराब होती है — त्वरित बाजार पहुंच जरूरी", "अधिक श्रम की आवश्यकता"],
-        "imageUrl": "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&q=80&w=800",
-    },
-    "Oilseeds": {
-        "nameHi": "तिलहन",
-        "description": "Crops like mustard and linseed grown for edible oil production.",
-        "descriptionHi": "सरसों और अलसी जैसी फसलें खाद्य तेल उत्पादन के लिए उगाई जाती हैं।",
-        "maintenance": "Requires well-drained soil, moderate rainfall, and minimal irrigation. Mustard is sown in October–November.",
-        "maintenanceHi": "अच्छी जल निकासी वाली मिट्टी, मध्यम वर्षा और न्यूनतम सिंचाई की जरूरत है।",
-        "pros": ["Good MSP support", "Low water requirement", "Can grow on marginal lands"],
-        "prosHi": ["अच्छा MSP समर्थन", "कम पानी की जरूरत", "बंजर जमीन पर भी उग सकता है"],
-        "cons": ["Yield affected by frost", "Aphid pest is a major concern"],
-        "consHi": ["पाले से उपज प्रभावित होती है", "माहू कीट एक बड़ी चिंता है"],
-        "imageUrl": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&q=80&w=800",
-    },
+    "Mustard": {
+        "nameHi": "सरसों",
+        "description": "A key oilseed crop for Jharkhand, typically grown in the Rabi season.",
+        "descriptionHi": "सरसों झारखंड के लिए एक प्रमुख तिलहन फसल है, जो आमतौर पर रबी मौसम में उगाई जाती है।",
+        "maintenance": "Requires well-drained soil and minimal irrigation. Sown in Oct-Nov.",
+        "maintenanceHi": "अच्छी जल निकासी वाली मिट्टी और न्यूनतम सिंचाई की जरूरत है। अक्टूबर-नवंबर में बोई जाती है।",
+        "pros": ["High oil content", "Low water requirement", "Good market value"],
+        "prosHi": ["उच्च तेल की मात्रा", "कम पानी की आवश्यकता", "अच्छा बाजार मूल्य"],
+        "cons": ["Sensitive to frost", "Aphid pest risk"],
+        "consHi": ["पाले के प्रति संवेदनशील", "माहू कीट का खतरा"],
+        "imageUrl": "https://images.unsplash.com/photo-1508349083404-96969c060ec4?auto=format&fit=crop&q=80&w=800",
+    }
 }
 
 # Fallback info for any crop the dictionary doesn't cover
@@ -174,7 +160,11 @@ def predict():
         soil = district_soil_data[district]
 
         # --- B. FETCH REAL-TIME WEATHER ---
-        api_key = "ab6cb60f7212eb21a43184223fd05229"
+        from dotenv import load_dotenv
+        import os
+
+        load_dotenv()
+        api_key = os.getenv("OPENWEATHER_API_KEY")
         weather_url = (
             f"https://api.openweathermap.org/data/2.5/weather"
             f"?q={district},IN&appid={api_key}&units=metric"
@@ -287,6 +277,10 @@ def predict():
 def health():
     return jsonify({"status": "ok", "message": "AgriAI backend is running!"})
 
+@app.route('/accuracy', methods=['GET'])
+def get_accuracy():
+    stats = joblib.load("accuracy.pkl")
+    return jsonify(stats)
 
 # ============================================================
 # 6. RUN
