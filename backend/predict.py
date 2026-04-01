@@ -282,6 +282,9 @@ def get_accuracy():
     stats = joblib.load("accuracy.pkl")
     return jsonify(stats)
 
+@app.route('/')
+def home():
+    return "Crop Advisor Backend is Running! 🌾"
 # ============================================================
 # 6. RUN
 #    ✅ FIX: Port changed to 5001 to match cropService.ts (API_BASE_URL)
