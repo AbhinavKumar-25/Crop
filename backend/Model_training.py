@@ -26,11 +26,10 @@ sns.heatmap(crops_data_num.corr(), annot=True)
 # Creating Pipelines
 
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, OneHotEncoder, LabelEncoder,MinMaxScaler
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, LabelEncoder
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
-from sklearn.impute import SimpleImputer
-from sklearn.metrics import RocCurveDisplay,confusion_matrix
+from sklearn.metrics import confusion_matrix
 
 crop_data.info()
 
