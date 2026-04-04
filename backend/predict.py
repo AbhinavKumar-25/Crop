@@ -222,9 +222,22 @@ def predict(body: PredictRequest):        # ← Pydantic auto-parses & validates
 
     # FETCH REAL-TIME WEATHER
     api_key = os.getenv("OPENWEATHER_API_KEY")
+    
+    weather_city = district
+    if district in ["Saraikela-Kharsawan", "Seraikela Kharsawan"]:
+        weather_city = "Seraikela"
+    elif district == "East Singhbhum":
+        weather_city = "Jamshedpur"
+    elif district == "West Singhbhum":
+        weather_city = "Chaibasa"
+    elif district == "Palamu":
+        weather_city = "Medininagar"
+    elif district == "Bokaro":
+        weather_city = "Bokaro Steel City"
+
     weather_url = (
         f"https://api.openweathermap.org/data/2.5/weather"
-        f"?q={district},IN&appid={api_key}&units=metric"
+        f"?q={weather_city},IN&appid={api_key}&units=metric"
     )
 
     try:
@@ -235,7 +248,7 @@ def predict(body: PredictRequest):        # ← Pydantic auto-parses & validates
     if "main" not in w_res:
         raise HTTPException(
             status_code=502,
-            detail=f"Weather API error: {w_res.get('message', 'Unknown error')}"
+            detail=f"Weather API error: {w_res.get('message', 'City ' + weather_city + ' not found in OpenWeatherMap')}"
         )
 
     temp = w_res["main"]["temp"]

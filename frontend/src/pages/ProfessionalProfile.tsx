@@ -6,7 +6,7 @@ import {
   Sun, AlertCircle, CheckCircle2
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { predictCrop, PredictionResult, getDistricts, District } from '../services/cropService';
+import { predictCrop, PredictionResult, getDistricts, getAccuracy, District } from '../services/cropService';
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -167,8 +167,7 @@ const ProfessionalProfile: React.FC = () => {
 
   useEffect(() => {
     getDistricts().then(setDistricts);
-    fetch('http://localhost:5001/accuracy')
-      .then(r => r.json())
+    getAccuracy()
       .then(d => {
         setAccuracyStats(d);
         const raw = d.accuracy ?? d.test_accuracy ?? d.score ?? null;

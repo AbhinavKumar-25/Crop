@@ -5,7 +5,7 @@ import {
   Droplets, CloudSun, TestTube2, Activity, AlertCircle, Eye
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { speakText, getDistricts, predictCrop, District, PredictionResult } from '../services/cropService';
+import { speakText, getDistricts, predictCrop, getAccuracy, District, PredictionResult } from '../services/cropService';
 import { cropDetails } from '../data/cropData';
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import logo from '../assets/logo.png';
@@ -224,8 +224,7 @@ const FarmerProfile: React.FC = () => {
 
   // Fetch accuracy from backend
   useEffect(() => {
-    fetch('http://localhost:5001/accuracy')
-      .then(r => r.json())
+    getAccuracy()
       .then(d => {
         setAccuracyStats(d);
         // support both {accuracy: 0.94} or {test_accuracy: 0.94}

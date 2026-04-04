@@ -58,6 +58,13 @@ export const getDistricts = async () => {
   return data;
 };
 
+export const getAccuracy = async () => {
+  const res = await fetch(`${API_URL}/accuracy`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Failed to fetch accuracy");
+  return data;
+};
+
 // MAIN PREDICTION (CONNECTED TO YOUR ML BACKEND)
 
 export const predictCrop = async (districtId: string) => {
