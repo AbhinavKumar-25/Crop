@@ -1,27 +1,41 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import joblib
 import requests
-import numpy as np
 import datetime
 import pandas as pd
+from dotenv import load_dotenv
+import os
+import json
+from google import genai
 
-app = Flask(__name__)
-CORS(app)  # Allow React to talk to Python
+# APP SETUP
+app = FastAPI(title="AgriAI Crop Advisor", version="1.0.0")
 
-# 1. LOAD MODEL FILES
+# Allow React frontend to talk to this backend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Replace with your frontend URL in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
+load_dotenv()
+
+# LOAD MODEL FILES
 try:
     model = joblib.load("model.pkl")
     encoder = joblib.load("label_encoder.pkl")
     print("✅ Model and encoder loaded successfully!")
 except Exception as e:
     print(f"❌ Error loading model files: {e}")
+    model = None
+    encoder = None
 
 
-# ============================================================
-# 2. DISTRICT SOIL DATA
-# ============================================================
+# DISTRICT SOIL DATA
 district_soil_data = {
     "Bokaro":               {"N": 91.23,  "P": 165.51, "K": 136.77, "pH": 5.89},
     "Chatra":               {"N": 104.92, "P": 150.89, "K": 148.75, "pH": 6.48},
@@ -50,9 +64,7 @@ district_soil_data = {
 }
 
 
-# ============================================================
-# 3. CROP INFO DATABASE
-# ============================================================
+# CROP INFO DATABASE
 crop_info = {
     "Paddy": {
         "nameHi": "धान",
@@ -113,11 +125,12 @@ crop_info = {
         "cons": ["Sensitive to frost", "Aphid pest risk"],
         "consHi": ["पाले के प्रति संवेदनशील", "माहू कीट का खतरा"],
         "imageUrl": "https://images.unsplash.com/photo-1508349083404-96969c060ec4?auto=format&fit=crop&q=80&w=800",
-    }
+    },
 }
 
-# Fallback info for any crop the dictionary doesn't cover
-def get_crop_info(crop_name):
+
+def get_crop_info(crop_name: str) -> dict:
+    """Fallback info for any crop the dictionary doesn't cover."""
     return crop_info.get(crop_name, {
         "nameHi": crop_name,
         "description": f"{crop_name} is well-suited to this district's current soil and climate conditions.",
@@ -132,162 +145,234 @@ def get_crop_info(crop_name):
     })
 
 
-@app.route('/districts', methods=['GET'])
+# REQUEST / RESPONSE MODELS
+class PredictRequest(BaseModel):
+    district: str
+
+
+# ROUTES
+
+@app.get("/")
+def home():
+    return {"message": "Crop Advisor Backend is Running! 🌾"}
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "message": "AgriAI backend is running!"}
+
+
+district_hindi_names = {
+    "Bokaro": "बोकारो", "Chatra": "चतरा", "Deoghar": "देवघर",
+    "Dhanbad": "धनबाद", "Dumka": "दुमका", "East Singhbhum": "पूर्वी सिंहभूम",
+    "Garhwa": "गढ़वा", "Giridih": "गिरिडीह", "Godda": "गोड्डा",
+    "Gumla": "गुमला", "Hazaribagh": "हजारीबाग", "Jamtara": "जामताड़ा",
+    "Khunti": "खूंटी", "Koderma": "कोडरमा", "Latehar": "लातेहार",
+    "Lohardaga": "लोहरदगा", "Pakur": "पाकुड़", "Palamu": "पलामू",
+    "Ramgarh": "रामगढ़", "Ranchi": "रांची", "Sahibganj": "साहिबगंज",
+    "Saraikela-Kharsawan": "सरायकेला-खरसावां", "Simdega": "सिमडेगा",
+    "West Singhbhum": "पश्चिमी सिंहभूम",
+}
+
+@app.get("/districts")
 def get_districts():
-    # This automatically converts your dictionary keys into a list for the dropdown
-    districts = []
-    for name in district_soil_data.keys():
-        districts.append({
+    districts = [
+        {
             "code": name,
             "name": name,
-            "nameHi": name # You can add a mapping for Hindi names here
-        })
-    return jsonify(districts)
-
-# ============================================================
-# 4. MAIN PREDICTION ROUTE
-# ============================================================
-@app.route('/predict', methods=['POST'])
-def predict():
-    try:
-        data = request.json
-        district = data.get('district')
-
-        if not district or district not in district_soil_data:
-            return jsonify({"error": "Invalid or missing district name."}), 400
-
-        # --- A. GET SOIL DATA ---
-        soil = district_soil_data[district]
-
-        # --- B. FETCH REAL-TIME WEATHER ---
-        from dotenv import load_dotenv
-        import os
-
-        load_dotenv()
-        api_key = os.getenv("OPENWEATHER_API_KEY")
-        weather_url = (
-            f"https://api.openweathermap.org/data/2.5/weather"
-            f"?q={district},IN&appid={api_key}&units=metric"
-        )
-        w_res = requests.get(weather_url, timeout=10).json()
-
-        # Guard against bad weather API responses
-        if "main" not in w_res:
-            return jsonify({"error": f"Weather API error: {w_res.get('message', 'Unknown error')}"}), 502
-
-        temp = w_res["main"]["temp"]
-        hum  = w_res["main"]["humidity"]
-        rain = w_res.get("rain", {}).get("1h", 0.0)  # 0 if not raining
-
-        # --- C. ML PREDICTION ---
-        if model is None:
-            return jsonify({"error": "Model file not loaded. Check server logs."}), 500
-
-        # Create a Pandas DataFrame with the exact column names from your Jupyter Notebook
-        feature_columns = ['N', 'P', 'K', 'Temperature_C', 'Humidity_%', 'pH', 'Rainfall_mm']
-        
-        features_df = pd.DataFrame([[
-            soil['N'], 
-            soil['P'], 
-            soil['K'], 
-            temp, 
-            hum, 
-            soil['pH'], 
-            rain
-        ]], columns=feature_columns)
-        
-        print(f"📡 Sending features to model:\n{features_df}")
-        
-        # Predict using the DataFrame
-        prediction = model.predict(features_df)
-
-        # Robust Decoding: Checks if the output is already a string
-        if isinstance(prediction[0], str):
-            crop_name = prediction[0]
-        elif encoder is not None:
-            crop_name = encoder.inverse_transform(prediction)[0]
-        else:
-            crop_name = str(prediction[0])
-
-        # Confidence Score Check
-        try:
-            confidence = round(float(model.predict_proba(features_df).max()), 2)
-        except AttributeError:
-            confidence = 0.85
-
-        # --- D. BUILD 5-DAY FORECAST ---
-        days_en = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        days_hi = ["सोम", "मंगल", "बुध", "गुरु", "शुक्र", "शनि", "रवि"]
-        today = datetime.datetime.now().weekday()
-
-        forecast = []
-        for i in range(5):
-            day_idx = (today + i) % 7
-            # Simple heuristic: show rain for first 2 days if it's raining now
-            is_rainy = (rain > 0 and i < 2)
-            condition    = "Rain Likely" if is_rainy else "Sunny"
-            condition_hi = "बारिश संभव" if is_rainy else "धूप"
-            forecast.append({
-                "d":  days_en[day_idx],
-                "dh": days_hi[day_idx],
-                "t":  round(temp - (i * 0.4), 1),   # slight temp variation across days
-                "c":  condition,
-                "ch": condition_hi,
-            })
-
-        # --- E. ASSEMBLE FULL RESPONSE ---
-        info = get_crop_info(crop_name)
-
-        return jsonify({
-            "crop": {
-                "name":          crop_name,
-                "nameHi":        info["nameHi"],
-                "description":   info["description"],
-                "descriptionHi": info["descriptionHi"],
-                "maintenance":   info["maintenance"],
-                "maintenanceEn": info["maintenance"],   # alias expected by FarmerProfile
-                "maintenanceHi": info["maintenanceHi"],
-                "pros":          info["pros"],
-                "prosHi":        info["prosHi"],
-                "cons":          info["cons"],
-                "consHi":        info["consHi"],
-                "imageUrl":      info["imageUrl"],
-            },
-            "soil": {
-                "n":    round(soil['N'],  2),
-                "p":    round(soil['P'],  2),
-                "k":    round(soil['K'],  2),
-                "ph":   round(soil['pH'], 2),
-                "temp": round(temp,       1),
-                "hum":  hum,
-                "rain": round(rain,       2),
-            },
-            "confidence": confidence,
-            "forecast":   forecast,
-        })
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+            "nameHi": district_hindi_names.get(name, name)  # ← now returns real Hindi name
+        }
+        for name in district_soil_data.keys()
+    ]
+    return districts
 
 
-# ============================================================
-# 5. HEALTH CHECK ROUTE (useful for debugging)
-# ============================================================
-@app.route('/health', methods=['GET'])
-def health():
-    return jsonify({"status": "ok", "message": "AgriAI backend is running!"})
-
-@app.route('/accuracy', methods=['GET'])
+@app.get("/accuracy")
 def get_accuracy():
-    stats = joblib.load("accuracy.pkl")
-    return jsonify(stats)
+    try:
+        stats = joblib.load("accuracy.pkl")
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not load accuracy stats: {e}")
 
-@app.route('/')
-def home():
-    return "Crop Advisor Backend is Running! 🌾"
-# ============================================================
-# 6. RUN
-#    ✅ FIX: Port changed to 5001 to match cropService.ts (API_BASE_URL)
-# ============================================================
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=True)
+
+@app.post("/predict")
+def predict(body: PredictRequest):        # ← Pydantic auto-parses & validates the JSON body
+    district = body.district
+
+    # VALIDATE DISTRICT
+    if district not in district_soil_data:
+        raise HTTPException(status_code=400, detail="Invalid or missing district name.")
+
+    soil = district_soil_data[district]
+
+    # FETCH REAL-TIME WEATHER
+    api_key = os.getenv("OPENWEATHER_API_KEY")
+    weather_url = (
+        f"https://api.openweathermap.org/data/2.5/weather"
+        f"?q={district},IN&appid={api_key}&units=metric"
+    )
+
+    try:
+        w_res = requests.get(weather_url, timeout=10).json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Weather API request failed: {e}")
+
+    if "main" not in w_res:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Weather API error: {w_res.get('message', 'Unknown error')}"
+        )
+
+    temp = w_res["main"]["temp"]
+    hum  = w_res["main"]["humidity"]
+    rain = w_res.get("rain", {}).get("1h", 0.0)
+
+    # ML PREDICTION
+    if model is None:
+        raise HTTPException(status_code=500, detail="Model file not loaded. Check server logs.")
+
+    feature_columns = ['N', 'P', 'K', 'Temperature_C', 'Humidity_%', 'pH', 'Rainfall_mm']
+    features_df = pd.DataFrame([[
+        soil['N'], soil['P'], soil['K'],
+        temp, hum, soil['pH'], rain
+    ]], columns=feature_columns)
+
+    print(f"📡 Sending features to model:\n{features_df}")
+
+    prediction = model.predict(features_df)
+
+    # Robust decoding
+    if isinstance(prediction[0], str):
+        crop_name = prediction[0]
+    elif encoder is not None:
+        crop_name = encoder.inverse_transform(prediction)[0]
+    else:
+        crop_name = str(prediction[0])
+
+    # Confidence score
+    try:
+        confidence = round(float(model.predict_proba(features_df).max()), 2)
+    except AttributeError:
+        confidence = 0.85
+
+    # BUILD 5-DAY FORECAST
+    days_en = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    days_hi = ["सोम", "मंगल", "बुध", "गुरु", "शुक्र", "शनि", "रवि"]
+    today   = datetime.datetime.now().weekday()
+
+    forecast = []
+    for i in range(5):
+        day_idx    = (today + i) % 7
+        is_rainy   = (rain > 0 and i < 2)
+        condition    = "Rain Likely" if is_rainy else "Sunny"
+        condition_hi = "बारिश संभव" if is_rainy else "धूप"
+        forecast.append({
+            "d":  days_en[day_idx],
+            "dh": days_hi[day_idx],
+            "t":  round(temp - (i * 0.4), 1),
+            "c":  condition,
+            "ch": condition_hi,
+        })
+
+    # ASSEMBLE RESPONSE
+    info = get_crop_info(crop_name)
+    
+    ai_desc = info["description"]
+    ai_desc_hi = info["descriptionHi"]
+
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    print(f"🔍 DEBUG: Gemini API Key loaded? {'YES' if gemini_key else 'NO'}")
+    
+    if gemini_key:
+        try:
+            print("🚀 Generating AI crop description...")
+            client = genai.Client(api_key=gemini_key)
+            prompt = f"""Act as an agricultural expert. Give detailed insights for the crop {crop_name} growing in {district} Jharkhand under current weather.
+Return EXACTLY a JSON object with this format, NO markdown, NO code block ticks.
+{{
+  "descriptionEn": "2 to 3 lines describing why it thrives and uses.",
+  "descriptionHi": "Hindi translation of description.",
+  "sloganEn": "A short, catchy, professional 1-line slogan about growing this crop.",
+  "sloganHi": "Hindi translation of the slogan.",
+  "maintenanceEn": "1-2 lines summarizing primary maintenance required.",
+  "maintenanceHi": "Hindi translation of maintenance.",
+  "prosEn": ["advantage 1", "advantage 2", "advantage 3"],
+  "prosHi": ["फ़ायदा 1", "फ़ायदा 2", "फ़ायदा 3"],
+  "consEn": ["challenge 1", "challenge 2", "challenge 3"],
+  "consHi": ["चुनौती 1", "चुनौती 2", "चुनौती 3"],
+  "watchOutEn": "1 sentence on a key disease or pest to watch out for.",
+  "watchOutHi": "Hindi translation of the watch out warning."
+}}"""
+            gen_res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+            res_text = gen_res.text.strip()
+            if res_text.startswith("```json"): res_text = res_text[7:]
+            if res_text.startswith("```"): res_text = res_text[3:]
+            if res_text.endswith("```"): res_text = res_text[:-3]
+            res_text = res_text.strip()
+            
+            ai_data = json.loads(res_text)
+            ai_desc = ai_data.get("descriptionEn", ai_desc)
+            ai_desc_hi = ai_data.get("descriptionHi", ai_desc_hi)
+            extended_ai_data = ai_data
+            print("✅ Gemini AI full profile successfully injected!")
+        except Exception as e:
+            print(f"⚠️ Gemini AI generation failed: {e}")
+            if 'res_text' in locals():
+                print(f"RAW FAILED TEXT WAS: {res_text}")
+
+    # Fill extended fields or fall back
+    slogan_en = extended_ai_data.get("sloganEn", "Secure and maximize your yield with data-backed precision.") if "extended_ai_data" in locals() else "Secure and maximize your yield with data-backed precision."
+    slogan_hi = extended_ai_data.get("sloganHi", "डेटा-समर्थित निर्णयों से अपनी उपज को सुरक्षित और अधिकतम करें।") if "extended_ai_data" in locals() else "डेटा-समर्थित निर्णयों से अपनी उपज को सुरक्षित और अधिकतम करें।"
+    
+    maint_en = extended_ai_data.get("maintenanceEn", info["maintenance"]) if "extended_ai_data" in locals() else info["maintenance"]
+    maint_hi = extended_ai_data.get("maintenanceHi", info.get("maintenanceHi", info["maintenance"])) if "extended_ai_data" in locals() else info.get("maintenanceHi", info["maintenance"])
+
+    pros_en = extended_ai_data.get("prosEn", info["pros"]) if "extended_ai_data" in locals() else info["pros"]
+    pros_hi = extended_ai_data.get("prosHi", info.get("prosHi", info["pros"])) if "extended_ai_data" in locals() else info.get("prosHi", info["pros"])
+
+    cons_en = extended_ai_data.get("consEn", info["cons"]) if "extended_ai_data" in locals() else info["cons"]
+    cons_hi = extended_ai_data.get("consHi", info.get("consHi", info["cons"])) if "extended_ai_data" in locals() else info.get("consHi", info["cons"])
+
+    watch_out_en = extended_ai_data.get("watchOutEn", "Consult local guidelines for pest control.") if "extended_ai_data" in locals() else "Consult local guidelines for pest control."
+    watch_out_hi = extended_ai_data.get("watchOutHi", "कीट नियंत्रण के लिए स्थानीय कृषि दिशानिर्देशों का पालन करें।") if "extended_ai_data" in locals() else "कीट नियंत्रण के लिए स्थानीय कृषि दिशानिर्देशों का पालन करें。"
+
+    return {
+        "crop": {
+            "name":          crop_name,
+            "nameHi":        info["nameHi"],
+            "description":   ai_desc,
+            "descriptionHi": ai_desc_hi,
+            "aiGenerated":   True if "extended_ai_data" in locals() else False,
+            "sloganEn":      slogan_en,
+            "sloganHi":      slogan_hi,
+            "maintenance":   maint_en,
+            "maintenanceHi": maint_hi,
+            "pros":          pros_en,
+            "prosHi":        pros_hi,
+            "cons":          cons_en,
+            "consHi":        cons_hi,
+            "watchOutEn":    watch_out_en,
+            "watchOutHi":    watch_out_hi,
+            "imageUrl":      info["imageUrl"],
+        },
+        "soil": {
+            "n":    round(soil['N'],  2),
+            "p":    round(soil['P'],  2),
+            "k":    round(soil['K'],  2),
+            "ph":   round(soil['pH'], 2),
+            "temp": round(temp,       1),
+            "hum":  hum,
+            "rain": round(rain,       2),
+        },
+        "confidence": confidence,
+        "forecast":   forecast,
+    }
+
+
+# RUN
+# uvicorn replaces Flask's dev server
+# Run from terminal: uvicorn predict:app --host 0.0.0.0 --port 5001 --reload
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("predict:app", host="0.0.0.0", port=5001, reload=True)

@@ -29,6 +29,8 @@ const translations: Record<Language, Record<string, string>> = {
     'back': 'Back',
     'listen': 'Listen to Audio',
     'language': 'Language',
+    'profile.farmer.subdesc': 'Get crop advice based on soil & weather parameters.',
+    'profile.pro.subdesc': 'Data analytics, Data Visualization and soil nutrient mapping.',
   },
   hi: {
     'app.title': 'झारखंड फसल सलाहकार',
@@ -50,6 +52,9 @@ const translations: Record<Language, Record<string, string>> = {
     'back': 'पीछे',
     'listen': 'ऑडियो सुनें',
     'language': 'भाषा',
+    'profile.farmer.subdesc': 'सरल भाषा में मिट्टी और मौसम के आधार पर फसल की जानकारी प्राप्त करें।',
+    'profile.pro.subdesc': 'पेशेवरों के लिए विस्तृत डेटा विश्लेषण और मिट्टी पोषक तत्व मानचित्रण।',
+
   }
 };
 

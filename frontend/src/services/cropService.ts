@@ -6,6 +6,13 @@ export interface PredictionResult {
     nameHi: string;
     description: string;
     descriptionHi: string;
+    aiGenerated?: boolean;
+    sloganEn?: string;
+    sloganHi?: string;
+    watchOutEn?: string;
+    watchOutHi?: string;
+    waterNeeded?: number;
+    daysToHarvest?: number;
     maintenance: string;
     maintenanceHi: string;
     pros: string[];
@@ -40,21 +47,19 @@ export interface District {
   nameHi: string;
 }
 
-//////////////////////////////////////////////////////
-// 🔥 GET DISTRICTS (FROM BACKEND)
-//////////////////////////////////////////////////////
+// GET DISTRICTS (FROM BACKEND)
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
 export const getDistricts = async () => {
-  const res = await fetch("http://localhost:5001/districts");
+  const res = await fetch(`${API_URL}/districts`);
   return res.json();
 };
 
-//////////////////////////////////////////////////////
-// 🔥 MAIN PREDICTION (CONNECTED TO YOUR ML BACKEND)
-//////////////////////////////////////////////////////
+// MAIN PREDICTION (CONNECTED TO YOUR ML BACKEND)
 
 export const predictCrop = async (districtId: string) => {
-  const res = await fetch("http://localhost:5001/predict", {
+  const res = await fetch(`${API_URL}/predict`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -67,9 +72,7 @@ export const predictCrop = async (districtId: string) => {
   return res.json();
 };
 
-//////////////////////////////////////////////////////
-// 🔊 VOICE SUPPORT
-//////////////////////////////////////////////////////
+// VOICE SUPPORT
 
 export const speakText = (text: string, lang: 'hi-IN' | 'en-US' = 'hi-IN') => {
   if ('speechSynthesis' in window) {
