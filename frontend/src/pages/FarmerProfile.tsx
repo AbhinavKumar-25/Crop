@@ -360,7 +360,7 @@ const FarmerProfile: React.FC = () => {
         </div>
       </motion.header>
 
-      <main className="max-w-2xl mx-auto p-6 space-y-6 relative z-10 flex flex-col items-stretch">
+      <main className="flex-grow w-full max-w-2xl mx-auto p-4 sm:p-6 space-y-6 relative z-10 flex flex-col items-stretch">
 
         {/* WELCOME */}
         <div className="text-center mb-4">
@@ -373,7 +373,7 @@ const FarmerProfile: React.FC = () => {
         </div>
 
         {/* INPUT CARD */}
-        <div className="w-full bg-white/90 backdrop-blur-md p-8 rounded-[2.5rem] shadow-sm border border-white/20">
+        <div className="w-full bg-white/90 backdrop-blur-md p-6 sm:p-8 rounded-[2.5rem] shadow-sm border border-white/20">
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
             <MapPin size={14} className="text-green-600" />
             {language === 'hi' ? 'अपना जिला चुनें' : 'Choose District'}
@@ -447,7 +447,7 @@ const FarmerProfile: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="p-8">
+                <div className="p-6 sm:p-8">
                   {/* Audio */}
                   <div className="flex justify-between items-start mb-6">
                     <div className="flex-1 pr-4">
@@ -523,7 +523,7 @@ const FarmerProfile: React.FC = () => {
               </div>
 
               {/* 2. SOIL VISUALIZATION (Circular Rings) */}
-              <div className="bg-white/90 backdrop-blur-md p-8 rounded-[2.5rem] shadow-sm border border-white/20">
+              <div className="bg-white/90 backdrop-blur-md p-6 sm:p-8 rounded-[2.5rem] shadow-sm border border-white/20">
                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                   <TestTube2 size={14} className="text-green-600" />
                   {language === 'hi' ? 'मिट्टी की स्थिति' : 'Soil Nutrient Status'}
@@ -555,7 +555,7 @@ const FarmerProfile: React.FC = () => {
               </div>
 
               {/* 3. ACCURACY + CROP SUITABILITY CARD */}
-              <div className="bg-white/90 backdrop-blur-md p-8 rounded-[2.5rem] shadow-sm border border-white/20">
+              <div className="bg-white/90 backdrop-blur-md p-6 sm:p-8 rounded-[2.5rem] shadow-sm border border-white/20">
                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                   <Activity size={14} className="text-green-600" />
                   {language === 'hi' ? 'AI सटीकता और फसल उपयुक्तता' : 'AI Accuracy & Crop Suitability'}
@@ -616,14 +616,14 @@ const FarmerProfile: React.FC = () => {
               </div>
 
               {/* 4. WEATHER FORECAST */}
-              <div className="bg-white/90 backdrop-blur-md p-8 rounded-[2.5rem] shadow-sm border border-white/20">
+              <div className="bg-white/90 backdrop-blur-md p-6 sm:p-8 rounded-[2.5rem] shadow-sm border border-white/20">
                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                   <CloudSun size={14} className="text-blue-500" />
                   {language === 'hi' ? '5 दिन का मौसम पूर्वानुमान' : '5-Day Environmental Forecast'}
                 </h4>
-                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                   {result.forecast?.map((w, i) => (
-                    <div key={i} className="min-w-[105px] flex flex-col items-center p-4 rounded-3xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-lg transition-all group">
+                    <div key={i} className="flex flex-col items-center p-4 rounded-3xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-lg transition-all group">
                       <span className="text-[9px] font-black text-slate-400 uppercase">{language === 'hi' ? w.dh : w.d}</span>
                       <div className="my-3 text-blue-500 group-hover:scale-110 transition-transform">
                         {w.c.includes('Rain') ? <CloudRain size={22} /> : <Sun size={22} />}
