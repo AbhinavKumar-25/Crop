@@ -335,7 +335,7 @@ Return EXACTLY a JSON object with this format, NO markdown, NO code block ticks.
             res_text = ""
             for attempt in range(3):
                 try:
-                    gen_res = client.models.generate_content(model='gemini-1.5-flash', contents=prompt)
+                    gen_res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
                     res_text = gen_res.text.strip()
                     
                     # Robust parsing
