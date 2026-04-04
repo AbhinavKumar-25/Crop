@@ -9,6 +9,7 @@ import pandas as pd
 from dotenv import load_dotenv
 import os
 import json
+import re
 from google import genai
 
 # APP SETUP
@@ -317,14 +318,27 @@ Return EXACTLY a JSON object with this format, NO markdown, NO code block ticks.
   "watchOutEn": "1 sentence on a key disease or pest to watch out for.",
   "watchOutHi": "Hindi translation of the watch out warning."
 }}"""
-            gen_res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
-            res_text = gen_res.text.strip()
-            if res_text.startswith("```json"): res_text = res_text[7:]
-            if res_text.startswith("```"): res_text = res_text[3:]
-            if res_text.endswith("```"): res_text = res_text[:-3]
-            res_text = res_text.strip()
+            ai_data = None
+            res_text = ""
+            for attempt in range(3):
+                try:
+                    gen_res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+                    res_text = gen_res.text.strip()
+                    
+                    # Robust parsing
+                    match = re.search(r'\{.*\}', res_text, re.DOTALL)
+                    if match:
+                        ai_data = json.loads(match.group(0))
+                        break # Successfully parsed!
+                    else:
+                        raise ValueError("No JSON block found in response")
+                except Exception as ex:
+                    print(f"⚠️ Gemini attempt {attempt+1} failed: {ex}")
+                    if attempt < 2:
+                        time.sleep(2) # Backoff for rate limits
+                    else:
+                        raise # Give up and fallback
             
-            ai_data = json.loads(res_text)
             ai_desc = ai_data.get("descriptionEn", ai_desc)
             ai_desc_hi = ai_data.get("descriptionHi", ai_desc_hi)
             extended_ai_data = ai_data
