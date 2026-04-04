@@ -1,18 +1,13 @@
 {
-    "version": 2,
-    "rewrites": [
-        {
-            "source": "/api/(.*)",
-            "destination": "/backend/predict.py"
+    "experimentalServices": {
+        "frontend": {
+            "entrypoint": "frontend",
+            "routePrefix": "/",
+            "framework": "vite"
         },
-        {
-            "source": "/(.*)",
-            "destination": "/frontend/$1"
-        }
-    ],
-    "functions": {
-        "backend/predict.py": {
-            "runtime": "vercel-python@0.1.0"
+        "backend": {
+            "entrypoint": "backend/predict.py",
+            "routePrefix": "/api"
         }
     }
 }
