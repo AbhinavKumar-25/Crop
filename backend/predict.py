@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import joblib
 import requests
 import datetime
+import time
 import pandas as pd
 from dotenv import load_dotenv
 import os
@@ -196,6 +197,10 @@ def get_accuracy():
         raise HTTPException(status_code=500, detail=f"Could not load accuracy stats: {e}")
 
 
+# PREDICTION CACHE
+prediction_cache = {}
+CACHE_TTL_SECONDS = 600  # 10 minutes cache per district
+
 @app.post("/predict")
 def predict(body: PredictRequest):        # ← Pydantic auto-parses & validates the JSON body
     district = body.district
@@ -203,6 +208,14 @@ def predict(body: PredictRequest):        # ← Pydantic auto-parses & validates
     # VALIDATE DISTRICT
     if district not in district_soil_data:
         raise HTTPException(status_code=400, detail="Invalid or missing district name.")
+
+    # CHECK CACHE
+    now = time.time()
+    if district in prediction_cache:
+        cached_result, timestamp = prediction_cache[district]
+        if now - timestamp < CACHE_TTL_SECONDS:
+            print(f"📦 Returning cached prediction for {district}")
+            return cached_result
 
     soil = district_soil_data[district]
 
@@ -337,7 +350,7 @@ Return EXACTLY a JSON object with this format, NO markdown, NO code block ticks.
     watch_out_en = extended_ai_data.get("watchOutEn", "Consult local guidelines for pest control.") if "extended_ai_data" in locals() else "Consult local guidelines for pest control."
     watch_out_hi = extended_ai_data.get("watchOutHi", "कीट नियंत्रण के लिए स्थानीय कृषि दिशानिर्देशों का पालन करें।") if "extended_ai_data" in locals() else "कीट नियंत्रण के लिए स्थानीय कृषि दिशानिर्देशों का पालन करें。"
 
-    return {
+    final_result = {
         "crop": {
             "name":          crop_name,
             "nameHi":        info["nameHi"],
@@ -368,6 +381,9 @@ Return EXACTLY a JSON object with this format, NO markdown, NO code block ticks.
         "confidence": confidence,
         "forecast":   forecast,
     }
+
+    prediction_cache[district] = (final_result, now)
+    return final_result
 
 
 # RUN

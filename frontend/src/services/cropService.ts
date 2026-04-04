@@ -53,7 +53,9 @@ const API_URL = import.meta.env.VITE_API_URL || "https://crop-advisor-backend-3p
 
 export const getDistricts = async () => {
   const res = await fetch(`${API_URL}/districts`);
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Failed to fetch districts");
+  return data;
 };
 
 // MAIN PREDICTION (CONNECTED TO YOUR ML BACKEND)
@@ -69,7 +71,9 @@ export const predictCrop = async (districtId: string) => {
     })
   });
 
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Failed to fetch prediction");
+  return data;
 };
 
 // VOICE SUPPORT

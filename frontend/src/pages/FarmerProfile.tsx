@@ -374,7 +374,7 @@ const FarmerProfile: React.FC = () => {
         </div>
 
         {/* INPUT CARD */}
-        <div className="w-[672px] max-w-full bg-white/90 backdrop-blur-md p-8 rounded-[2.5rem] shadow-sm border border-white/20">
+        <div className="w-full bg-white/90 backdrop-blur-md p-8 rounded-[2.5rem] shadow-sm border border-white/20">
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
             <MapPin size={14} className="text-green-600" />
             {language === 'hi' ? 'अपना जिला चुनें' : 'Choose District'}
@@ -547,7 +547,7 @@ const FarmerProfile: React.FC = () => {
                     <CloudSun size={14} className="text-blue-500" />
                     {language === 'hi' ? 'मौसम की स्थिति' : 'Current Weather'}
                   </p>
-                  <div className="grid grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                     <CircleRing label={language === 'hi' ? 'तापमान' : 'Temperature'} value={result.soil.temp} max={50} minIdeal={15} maxIdeal={35} color="#f97316" unit="°C" />
                     <CircleRing label={language === 'hi' ? 'नमी' : 'Humidity'} value={result.soil.hum} max={100} minIdeal={40} maxIdeal={80} color="#06b6d4" unit="%" />
                     <CircleRing label={language === 'hi' ? 'वर्षा' : 'Rainfall'} value={result.soil.rain} max={50} minIdeal={0} maxIdeal={25} color="#6366f1" unit="mm" />
@@ -582,7 +582,7 @@ const FarmerProfile: React.FC = () => {
                 {stats && (
                   <div className="space-y-4">
                     {/* Water + Days strip */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="bg-blue-50 rounded-2xl p-5 flex items-center gap-4 border border-blue-100">
                         <div className="bg-blue-100 p-3 rounded-xl">
                           <Droplets size={20} className="text-blue-600" />
