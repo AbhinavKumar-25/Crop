@@ -49,7 +49,7 @@ export interface District {
 
 // GET DISTRICTS (FROM BACKEND)
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
+const API_URL = import.meta.env.VITE_API_URL || "https://crop-advisor-backend-3plz.onrender.com";
 
 export const getDistricts = async () => {
   const res = await fetch(`${API_URL}/districts`);
