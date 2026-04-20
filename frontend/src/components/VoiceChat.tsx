@@ -200,7 +200,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ contextStr }) => {
             </div>
 
             {/* Input Area */}
-            <div className="p-4 bg-slate-950/80 border-t border-white/5 backdrop-blur-2xl">
+            <div className="p-4 bg-slate-950/80 border-t border-white/5 backdrop-blur-2xl flex flex-col gap-3">
               <div className="flex items-center gap-2 bg-white/5 p-1.5 rounded-full border border-white/10 shadow-inner group focus-within:border-emerald-500/50 focus-within:bg-white/10 transition-all">
                 <button
                   onClick={toggleListen}
@@ -224,6 +224,9 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ contextStr }) => {
                   <Send size={16} strokeWidth={2.5}/>
                 </button>
               </div>
+              <p className="text-[10px] text-center text-white/40 font-medium px-2">
+                {language === 'hi' ? 'एग्री-एआई गलतियाँ कर सकता है..!! बेहतर परिणामों के लिए डैशबोर्ड देखें' : 'AGRIAI can make mistakes..!! check the dashboard for better results'}
+              </p>
             </div>
           </motion.div>
         )}
