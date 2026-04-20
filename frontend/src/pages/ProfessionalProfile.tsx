@@ -431,7 +431,7 @@ const ProfessionalProfile: React.FC = () => {
                       {result.crop.aiGenerated && (
                         <div className="mt-4 flex items-center gap-1">
                           <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-full shadow-sm inline-flex">
-                            Powered by Gemini AI ✦
+                            Powered by Groq ✦
                           </span>
                         </div>
                       )}

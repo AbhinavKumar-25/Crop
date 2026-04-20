@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 import joblib
 import requests
 import datetime
@@ -10,7 +11,10 @@ from dotenv import load_dotenv
 import os
 import json
 import re
-from google import genai
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import random
 
 # APP SETUP
 app = FastAPI(title="AgriAI Crop Advisor", version="1.0.0")
@@ -70,6 +74,8 @@ district_soil_data = {
 crop_info = {
     "Paddy": {
         "nameHi": "धान",
+        "seasonMonths": [6, 7],
+        "durationDays": 120,
         "description": "A staple grain crop ideal for high rainfall and humid conditions in Jharkhand.",
         "descriptionHi": "झारखंड में अधिक वर्षा और आर्द्र परिस्थितियों के लिए उपयुक्त एक प्रमुख अनाज फसल।",
         "maintenance": "Requires standing water in fields, regular weeding, and nitrogen-rich fertilizers. Transplanting is done in June–July.",
@@ -82,6 +88,8 @@ crop_info = {
     },
     "Wheat": {
         "nameHi": "गेहूं",
+        "seasonMonths": [10, 11, 12],
+        "durationDays": 110,
         "description": "A rabi season crop well-suited for cool, dry winters with moderate rainfall.",
         "descriptionHi": "रबी मौसम की फसल जो ठंडी, शुष्क सर्दियों और मध्यम वर्षा के लिए उपयुक्त है।",
         "maintenance": "Needs well-drained loamy soil, 2–3 irrigations, and a balanced NPK fertilizer schedule.",
@@ -94,6 +102,8 @@ crop_info = {
     },
     "Maize": {
         "nameHi": "मक्का",
+        "seasonMonths": [6, 7],
+        "durationDays": 90,
         "description": "A versatile kharif crop with high yield potential in warm, well-drained soils.",
         "descriptionHi": "एक बहुमुखी खरीफ फसल जो गर्म, अच्छी जल निकासी वाली मिट्टी में अधिक उपज देती है।",
         "maintenance": "Requires moderate and consistent water supply, full sunlight, and phosphorus-rich fertilizer at sowing.",
@@ -106,6 +116,8 @@ crop_info = {
     },
     "Pulses": {
         "nameHi": "दालें",
+        "seasonMonths": [6, 7, 8, 9, 10, 11],
+        "durationDays": 75,
         "description": "Nitrogen-fixing legumes that improve soil health and provide high-protein food.",
         "descriptionHi": "नाइट्रोजन-स्थिर करने वाली फलियां जो मिट्टी की सेहत सुधारती हैं और प्रोटीन युक्त खाना देती हैं।",
         "maintenance": "Low water requirement. Fixes atmospheric nitrogen naturally, so minimal fertilizer is needed. Avoid waterlogging.",
@@ -118,6 +130,8 @@ crop_info = {
     },
     "Mustard": {
         "nameHi": "सरसों",
+        "seasonMonths": [10, 11],
+        "durationDays": 100,
         "description": "A key oilseed crop for Jharkhand, typically grown in the Rabi season.",
         "descriptionHi": "सरसों झारखंड के लिए एक प्रमुख तिलहन फसल है, जो आमतौर पर रबी मौसम में उगाई जाती है।",
         "maintenance": "Requires well-drained soil and minimal irrigation. Sown in Oct-Nov.",
@@ -147,9 +161,87 @@ def get_crop_info(crop_name: str) -> dict:
     })
 
 
+# LOCAL AI AGENT FOR CHATBOT
+
+def get_ml_crop_prediction(district_name: str, specific_crop: str = "") -> str:
+    """
+    Executes the Agricultural Machine Learning model for the given district.
+    Call this when a user asks for a prediction OR asks if a specific crop is suitable.
+    """
+    import os, requests
+    api_key = os.getenv("OPENWEATHER_API_KEY")
+    if not api_key: return "Error: OPENWEATHER_API_KEY is not set."
+    
+    dn = district_name.title()
+    if dn not in district_soil_data:
+        alias_map = {"Seraikela": "Saraikela-Kharsawan"}
+        if dn in alias_map: dn = alias_map[dn]
+        else: return f"District {district_name} not found in database."
+        
+    soil = district_soil_data[dn]
+    weather_city = dn
+    if dn == "Saraikela-Kharsawan": weather_city = "Seraikela"
+    elif dn == "East Singhbhum": weather_city = "Jamshedpur"
+    elif dn == "West Singhbhum": weather_city = "Chaibasa"
+    elif dn == "Palamu": weather_city = "Medininagar"
+    elif dn == "Bokaro": weather_city = "Bokaro Steel City"
+    
+    try:
+        url = f"https://api.openweathermap.org/data/2.5/weather?q={weather_city},IN&appid={api_key}&units=metric"
+        w_res = requests.get(url, timeout=5).json()
+        temp = w_res["main"]["temp"]
+        hum = w_res["main"]["humidity"]
+        rain = w_res.get("rain", {}).get("1h", 0.0)
+    except Exception as e:
+        return f"Weather API Failed: {e}"
+        
+    global model, encoder
+    if not model or not encoder: return "ML Model not loaded."
+    
+    import pandas as pd
+    features_df = pd.DataFrame([ [soil['N'], soil['P'], soil['K'], temp, hum, soil['pH'], rain] ], 
+                               columns=['N', 'P', 'K', 'Temperature_C', 'Humidity_%', 'pH', 'Rainfall_mm'])
+    probabilities = model.predict_proba(features_df)[0]
+    classes = encoder.classes_
+    
+    if specific_crop:
+        sc = specific_crop.lower()
+        for cls, prob in zip(classes, probabilities):
+            if str(cls).lower() == sc:
+                conf = round(float(prob) * 100, 1)
+                return f"Response Context for {specific_crop} in {district_name}: Confidence is {conf}%. Current weather is {temp}C, {hum}% humidity. N={soil['N']}, P={soil['P']}, K={soil['K']}."
+        return f"The crop '{specific_crop}' is not currently part of the ML Model's predictable classes."
+    else:
+        best_prob, best_crop = 0.0, ""
+        for cls, prob in zip(classes, probabilities):
+            if prob > best_prob:
+                best_prob = prob
+                best_crop = str(cls)
+        conf = round(float(best_prob) * 100, 1)
+        return f"Response Context for {district_name}: Best calculated crop is {best_crop} with {conf}% confidence. Current weather is {temp}C, {hum}% humidity."
+
+def fetch_crop_details(crop_name: str) -> str:
+    """Gets farming information like duration days, seasons, pros, cons, and maintenance for a given crop."""
+    info = get_crop_info(crop_name.title())
+    return f"Crop: {info.get('nameHi', crop_name)}, Duration: {info['durationDays']} days. Pros: {', '.join(info['pros'])}. Cons: {', '.join(info['cons'])}. Maintenance: {info['maintenance']}."
+
+
 # REQUEST / RESPONSE MODELS
 class PredictRequest(BaseModel):
     district: str
+    target_crop: Optional[str] = None
+    land_size_acres: Optional[float] = 1.0
+    start_date: Optional[str] = None
+
+class ChatMessage(BaseModel):
+    role: str
+    text: str
+
+class ChatRequest(BaseModel):
+    message: str
+    context: Optional[str] = None
+    history: Optional[list[ChatMessage]] = []
+    language: Optional[str] = "en"
 
 
 # ROUTES
@@ -205,17 +297,21 @@ CACHE_TTL_SECONDS = 600  # 10 minutes cache per district
 @app.post("/predict")
 def predict(body: PredictRequest):        # ← Pydantic auto-parses & validates the JSON body
     district = body.district
+    target_crop = body.target_crop
+    land_size_acres = body.land_size_acres or 1.0
+    start_date = body.start_date
 
     # VALIDATE DISTRICT
     if district not in district_soil_data:
         raise HTTPException(status_code=400, detail="Invalid or missing district name.")
 
     # CHECK CACHE
+    cache_key = f"{district}_{target_crop}_{land_size_acres}_{start_date}"
     now = time.time()
-    if district in prediction_cache:
-        cached_result, timestamp = prediction_cache[district]
+    if cache_key in prediction_cache:
+        cached_result, timestamp = prediction_cache[cache_key]
         if now - timestamp < CACHE_TTL_SECONDS:
-            print(f"📦 Returning cached prediction for {district}")
+            print(f"📦 Returning cached prediction for {cache_key}")
             return cached_result
 
     soil = district_soil_data[district]
@@ -277,11 +373,61 @@ def predict(body: PredictRequest):        # ← Pydantic auto-parses & validates
     else:
         crop_name = str(prediction[0])
 
-    # Confidence score
+    # Confidence score & Probabilities
+    conf_scores = []
+    worst_crop = "Unknown"
+    confidence = 0.85
+    
     try:
-        confidence = round(float(model.predict_proba(features_df).max()), 2)
-    except AttributeError:
-        confidence = 0.85
+        conf_arr = model.predict_proba(features_df)[0]
+        if encoder is not None:
+            classes = encoder.classes_
+            conf_scores = [{"crop": str(cls), "prob": round(float(prob), 2)} for cls, prob in zip(classes, conf_arr)]
+            conf_scores = sorted(conf_scores, key=lambda x: x["prob"], reverse=True)
+            confidence = conf_scores[0]["prob"]
+            worst_crop = conf_scores[-1]["crop"]
+    except Exception as e:
+        print(f"⚠️ Could not parse predict_proba: {e}")
+
+    # TARGET CROP LOGIC
+    target_crop_details = None
+    if target_crop and target_crop.lower() != crop_name.lower():
+        target_info = get_crop_info(target_crop)
+        
+        if start_date:
+            try:
+                start_dt = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+            except ValueError:
+                start_dt = datetime.datetime.now()
+        else:
+            start_dt = datetime.datetime.now()
+            
+        current_month = start_dt.month
+        season_months = target_info.get("seasonMonths", [])
+        
+        seasonality_warn = ""
+        seasonality_warn_hi = ""
+        if season_months and current_month not in season_months:
+            months_str = ', '.join([datetime.date(1900, m, 1).strftime('%B') for m in season_months])
+            seasonality_warn = f"Warning: The selected month is not ideal for planting {target_crop}. Best months are {months_str}."
+            seasonality_warn_hi = f"चेतावनी: चयनित महीना {target_crop} बोने के लिए सही नहीं है। सर्वोत्तम महीने {months_str} हैं।"
+            
+        harvest_dt = start_dt + datetime.timedelta(days=target_info.get("durationDays", 90))
+            
+        target_crop_details = {
+            "name": target_crop,
+            "nameHi": target_info.get("nameHi", target_crop),
+            "imageUrl": target_info.get("imageUrl", ""),
+            "durationDays": target_info.get("durationDays", 90),
+            "seasonalityWarning": seasonality_warn,
+            "seasonalityWarningHi": seasonality_warn_hi,
+            "harvestDate": harvest_dt.strftime("%Y-%m-%d"),
+            "startDate": start_dt.strftime("%Y-%m-%d"),
+            "remediationPlanEn": "",
+            "remediationPlanHi": "",
+            "landInsightsEn": "",
+            "landInsightsHi": "",
+        }
 
     # BUILD 5-DAY FORECAST
     days_en = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -308,35 +454,53 @@ def predict(body: PredictRequest):        # ← Pydantic auto-parses & validates
     ai_desc = info["description"]
     ai_desc_hi = info["descriptionHi"]
 
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    print(f"🔍 DEBUG: Gemini API Key loaded? {'YES' if gemini_key else 'NO'}")
+    groq_key = os.getenv("GROQ_API_KEY")
+    print(f"🔍 DEBUG: Groq API Key loaded? {'YES' if groq_key else 'NO'}")
     
-    if gemini_key:
+    extended_ai_data = None
+    if groq_key:
         try:
-            print("🚀 Generating AI crop description...")
-            client = genai.Client(api_key=gemini_key)
-            prompt = f"""Act as an agricultural expert. Give detailed insights for the crop {crop_name} growing in {district} Jharkhand under current weather.
+            print("🚀 Generating AI crop description with Groq natively...")
+            
+            prompt = f"""Act as an agricultural expert. Give detailed insights for the recommended crop {crop_name} growing in {district} Jharkhand under current weather.
+"""
+            if target_crop and target_crop.lower() != crop_name.lower():
+                prompt += f"""
+The farmer instead wants to grow a custom target crop: {target_crop} on {land_size_acres} acres.
+Provide a STEP-BY-STEP soil remediation plan. Explain how they can improve their current soil (N: {soil['N']}, P: {soil['P']}, K: {soil['K']}, pH: {soil['pH']}) to match the ideal conditions for {target_crop}.
+"""
+            else:
+                prompt += "Leave the target fields as empty strings.\n"
+
+            prompt += f"""
 Return EXACTLY a JSON object with this format, NO markdown, NO code block ticks.
 {{
-  "descriptionEn": "2 to 3 lines describing why it thrives and uses.",
+  "descriptionEn": "2 to 3 lines describing why {crop_name} thrives and uses.",
   "descriptionHi": "Hindi translation of description.",
-  "sloganEn": "A short, catchy, professional 1-line slogan about growing this crop.",
+  "sloganEn": "A short, catchy, professional 1-line slogan about growing {crop_name}.",
   "sloganHi": "Hindi translation of the slogan.",
-  "maintenanceEn": "1-2 lines summarizing primary maintenance required.",
+  "maintenanceEn": "1-2 lines summarizing primary maintenance required for {crop_name}.",
   "maintenanceHi": "Hindi translation of maintenance.",
   "prosEn": ["advantage 1", "advantage 2", "advantage 3"],
   "prosHi": ["फ़ायदा 1", "फ़ायदा 2", "फ़ायदा 3"],
   "consEn": ["challenge 1", "challenge 2", "challenge 3"],
   "consHi": ["चुनौती 1", "चुनौती 2", "चुनौती 3"],
-  "watchOutEn": "1 sentence on a key disease or pest to watch out for.",
-  "watchOutHi": "Hindi translation of the watch out warning."
+  "watchOutEn": "1 sentence on a key disease or pest to watch out for. Include WORST CASE scenario.",
+  "watchOutHi": "Hindi translation of the watch out warning.",
+  "targetLandInsightsEn": "1 sentence describing seed/fertilizer volume required for {target_crop} on {land_size_acres} acres.",
+  "targetLandInsightsHi": "Hindi translation.",
+  "targetRemediationPlanEn": "Step-by-step string on how to prep the soil for {target_crop}. Use '\\n' for new lines.",
+  "targetRemediationPlanHi": "Hindi translation."
 }}"""
             ai_data = None
             res_text = ""
             for attempt in range(3):
                 try:
-                    gen_res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
-                    res_text = gen_res.text.strip()
+                    headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
+                    payload = {"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": prompt}], "temperature": 0.2}
+                    resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=10)
+                    resp_json = resp.json()
+                    res_text = resp_json["choices"][0]["message"]["content"].strip()
                     
                     # Robust parsing
                     match = re.search(r'\{.*\}', res_text, re.DOTALL)
@@ -355,6 +519,13 @@ Return EXACTLY a JSON object with this format, NO markdown, NO code block ticks.
             ai_desc = ai_data.get("descriptionEn", ai_desc)
             ai_desc_hi = ai_data.get("descriptionHi", ai_desc_hi)
             extended_ai_data = ai_data
+            
+            if target_crop_details and "extended_ai_data" in locals() and extended_ai_data:
+                target_crop_details["remediationPlanEn"] = extended_ai_data.get("targetRemediationPlanEn", "")
+                target_crop_details["remediationPlanHi"] = extended_ai_data.get("targetRemediationPlanHi", "")
+                target_crop_details["landInsightsEn"] = extended_ai_data.get("targetLandInsightsEn", "")
+                target_crop_details["landInsightsHi"] = extended_ai_data.get("targetLandInsightsHi", "")
+                
             print("✅ Gemini AI full profile successfully injected!")
         except Exception as e:
             print(f"⚠️ Gemini AI generation failed: {e}")
@@ -362,20 +533,20 @@ Return EXACTLY a JSON object with this format, NO markdown, NO code block ticks.
                 print(f"RAW FAILED TEXT WAS: {res_text}")
 
     # Fill extended fields or fall back
-    slogan_en = extended_ai_data.get("sloganEn", "Secure and maximize your yield with data-backed precision.") if "extended_ai_data" in locals() else "Secure and maximize your yield with data-backed precision."
-    slogan_hi = extended_ai_data.get("sloganHi", "डेटा-समर्थित निर्णयों से अपनी उपज को सुरक्षित और अधिकतम करें।") if "extended_ai_data" in locals() else "डेटा-समर्थित निर्णयों से अपनी उपज को सुरक्षित और अधिकतम करें।"
+    slogan_en = extended_ai_data.get("sloganEn", "Secure and maximize your yield with data-backed precision.") if extended_ai_data else "Secure and maximize your yield with data-backed precision."
+    slogan_hi = extended_ai_data.get("sloganHi", "डेटा-समर्थित निर्णयों से अपनी उपज को सुरक्षित और अधिकतम करें।") if extended_ai_data else "डेटा-समर्थित निर्णयों से अपनी उपज को सुरक्षित और अधिकतम करें।"
     
-    maint_en = extended_ai_data.get("maintenanceEn", info["maintenance"]) if "extended_ai_data" in locals() else info["maintenance"]
-    maint_hi = extended_ai_data.get("maintenanceHi", info.get("maintenanceHi", info["maintenance"])) if "extended_ai_data" in locals() else info.get("maintenanceHi", info["maintenance"])
+    maint_en = extended_ai_data.get("maintenanceEn", info["maintenance"]) if extended_ai_data else info["maintenance"]
+    maint_hi = extended_ai_data.get("maintenanceHi", info.get("maintenanceHi", info["maintenance"])) if extended_ai_data else info.get("maintenanceHi", info["maintenance"])
 
-    pros_en = extended_ai_data.get("prosEn", info["pros"]) if "extended_ai_data" in locals() else info["pros"]
-    pros_hi = extended_ai_data.get("prosHi", info.get("prosHi", info["pros"])) if "extended_ai_data" in locals() else info.get("prosHi", info["pros"])
+    pros_en = extended_ai_data.get("prosEn", info["pros"]) if extended_ai_data else info["pros"]
+    pros_hi = extended_ai_data.get("prosHi", info.get("prosHi", info["pros"])) if extended_ai_data else info.get("prosHi", info["pros"])
 
-    cons_en = extended_ai_data.get("consEn", info["cons"]) if "extended_ai_data" in locals() else info["cons"]
-    cons_hi = extended_ai_data.get("consHi", info.get("consHi", info["cons"])) if "extended_ai_data" in locals() else info.get("consHi", info["cons"])
+    cons_en = extended_ai_data.get("consEn", info["cons"]) if extended_ai_data else info["cons"]
+    cons_hi = extended_ai_data.get("consHi", info.get("consHi", info["cons"])) if extended_ai_data else info.get("consHi", info["cons"])
 
-    watch_out_en = extended_ai_data.get("watchOutEn", "Consult local guidelines for pest control.") if "extended_ai_data" in locals() else "Consult local guidelines for pest control."
-    watch_out_hi = extended_ai_data.get("watchOutHi", "कीट नियंत्रण के लिए स्थानीय कृषि दिशानिर्देशों का पालन करें।") if "extended_ai_data" in locals() else "कीट नियंत्रण के लिए स्थानीय कृषि दिशानिर्देशों का पालन करें。"
+    watch_out_en = extended_ai_data.get("watchOutEn", "Consult local guidelines for pest control.") if extended_ai_data else "Consult local guidelines for pest control."
+    watch_out_hi = extended_ai_data.get("watchOutHi", "कीट नियंत्रण के लिए स्थानीय कृषि दिशानिर्देशों का पालन करें।") if extended_ai_data else "कीट नियंत्रण के लिए स्थानीय कृषि दिशानिर्देशों का पालन करें।"
 
     final_result = {
         "crop": {
@@ -383,7 +554,7 @@ Return EXACTLY a JSON object with this format, NO markdown, NO code block ticks.
             "nameHi":        info["nameHi"],
             "description":   ai_desc,
             "descriptionHi": ai_desc_hi,
-            "aiGenerated":   True if "extended_ai_data" in locals() else False,
+            "aiGenerated":   True if extended_ai_data else False,
             "sloganEn":      slogan_en,
             "sloganHi":      slogan_hi,
             "maintenance":   maint_en,
@@ -395,7 +566,9 @@ Return EXACTLY a JSON object with this format, NO markdown, NO code block ticks.
             "watchOutEn":    watch_out_en,
             "watchOutHi":    watch_out_hi,
             "imageUrl":      info["imageUrl"],
+            "durationDays":  info.get("durationDays", 90),
         },
+        "targetCropDetails": target_crop_details,
         "soil": {
             "n":    round(soil['N'],  2),
             "p":    round(soil['P'],  2),
@@ -406,11 +579,155 @@ Return EXACTLY a JSON object with this format, NO markdown, NO code block ticks.
             "rain": round(rain,       2),
         },
         "confidence": confidence,
+        "confScores": conf_scores,
+        "worstCrop":  worst_crop,
         "forecast":   forecast,
     }
 
-    prediction_cache[district] = (final_result, now)
+    prediction_cache[cache_key] = (final_result, now)
     return final_result
+
+
+@app.post("/chat")
+def chat(body: ChatRequest):
+    message = body.message
+    context = body.context or ""
+    history = body.history or []
+    lang = body.language or "en"
+    
+    try:
+        import os
+        import requests
+        groq_key = os.getenv("GROQ_API_KEY")
+        if not groq_key:
+            raise Exception("GROQ_API_KEY is not set.")
+        
+        system_prompt = f"""
+You are AGRI-AI, a concise proprietary agricultural assistant for Farmers in Jharkhand.
+Always greet the user warmly if it's the start of the conversation.
+
+YOUR STRICT RULES:
+1. When asked to predict a crop or check crop viability, ALWAYS use the `get_ml_crop_prediction` tool. If you do not know the district, ASK the user which district they are farming in first. Do not make assumptions.
+2. If predicting a crop, ALWAYS include a markdown hyperlink exactly formatted as: `[Click here for Full Prediction Dashboard](/farmer)`. Do NOT use standard html tags.
+3. If the user asks if a specific crop like "Wheat" is good instead of the predicted one, use the `get_ml_crop_prediction` tool providing specific_crop="Wheat". If confidence is low, explain why and contrast it with the recommended one.
+4. Correct spelling automatically. Keep responses conversational, empathetic, and extremely concise (Swiggy chat style).
+5. If the user asks how long a crop takes to grow, use `fetch_crop_details` tool.
+6. Weather, temperature, soil composition (NPK), and pH are ESSENTIAL agriculture data. ALWAYS answer users about them using the DASHBOARD STATE! NEVER decline questions about weather or soil!
+7. CRITICAL: The user interface is set to '{lang}'. YOUR ENTIRE TEXT RESPONSE MUST BE IN {'HINDI (Devanagari script)' if lang == 'hi' else 'ENGLISH'}. Do not provide dual translations.
+8. NEVER invoke ANY tool (like get_ml_crop_prediction) if the user is just saying "hello", "no", "yes", or making generic small talk! ONLY invoke tools when explicitly asked for farming metrics or crop checks!
+
+DASHBOARD STATE: {context}
+"""
+
+        messages = [{"role": "system", "content": system_prompt}]
+        for msg in history[-4:]: # Truncate to last 4 messages to prevent TPM Rate Limits
+            role = "user" if msg.role == "user" else "assistant"
+            messages.append({"role": role, "content": msg.text})
+            
+        messages.append({"role": "user", "content": message})
+        
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_ml_crop_prediction",
+                    "description": "Executes the Agricultural Machine Learning model for the given district. Call this when a user asks for a prediction OR asks if a specific crop is suitable.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "district_name": {"type": "string"},
+                            "specific_crop": {"type": "string"}
+                        },
+                        "required": ["district_name"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "fetch_crop_details",
+                    "description": "Gets farming information like duration days, seasons, pros, cons, and maintenance for a given crop.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "crop_name": {"type": "string"}
+                        },
+                        "required": ["crop_name"]
+                    }
+                }
+            }
+        ]
+
+        headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
+        payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "tools": tools, "tool_choice": "auto", "temperature": 0.3}
+        resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=10)
+        data = resp.json()
+        
+        if "error" in data:
+            raise Exception(data["error"].get("message", "Unknown Groq Error"))
+            
+        response_message = data["choices"][0]["message"]
+        
+        if response_message.get("tool_calls"):
+            # Ensure we only pass arguments dicts back, avoiding full object refs
+            messages.append(response_message)
+            import json
+            for tcall in response_message["tool_calls"]:
+                fn_name = tcall["function"]["name"]
+                try:
+                    fn_args = json.loads(tcall["function"]["arguments"])
+                except:
+                    fn_args = {}
+                
+                if fn_name == "get_ml_crop_prediction":
+                    res = get_ml_crop_prediction(fn_args.get("district_name", ""), fn_args.get("specific_crop", ""))
+                else:
+                    res = fetch_crop_details(fn_args.get("crop_name", ""))
+                
+                messages.append({
+                    "role": "tool",
+                    "name": fn_name,
+                    "content": res,
+                    "tool_call_id": tcall["id"]
+                })
+                
+            payload2 = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.3}
+            resp2 = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload2, timeout=10)
+            data2 = resp2.json()
+            if "error" in data2:
+                raise Exception(data2["error"].get("message", "Unknown Groq Tool Loop Error"))
+            final_text = data2["choices"][0]["message"]["content"]
+        else:
+            final_text = response_message.get("content", "Error generating response.")
+            
+        return {
+            "responseEn": final_text,
+            "responseHi": final_text
+        }
+        
+    except Exception as e:
+        import traceback
+        print(f"Chat generation error: {e}")
+        import re
+        fallback_msg = f"API Error: {str(e)} "
+        all_districts = ["Bokaro", "Chatra", "Deoghar", "Dhanbad", "Dumka", "East Singhbhum", "Garhwa", "Giridih", "Godda", "Gumla", "Hazaribagh", "Jamtara", "Khunti", "Koderma", "Latehar", "Lohardaga", "Pakur", "Palamu", "Ramgarh", "Ranchi", "Sahibganj", "Saraikela-Kharsawan", "Simdega", "West Singhbhum"]
+        fallback_dist = None
+        for d in all_districts:
+            if d.lower() in message.lower():
+                fallback_dist = d
+                break
+        if not fallback_dist:
+            dist_match = re.search(r"District:\s*([^,]+)", context)
+            fallback_dist = dist_match.group(1).strip() if dist_match else "Ranchi"
+        try:
+            local_ans = get_ml_crop_prediction(fallback_dist)
+            fallback_msg += f"Running local Machine Learning model directly: {local_ans} [Click here for Full Prediction Dashboard](/farmer)"
+        except Exception:
+            fallback_msg += "Local fallback failed."
+        return {
+            "responseEn": fallback_msg,
+            "responseHi": "एग्री-एआई सर्वर एपीआई कोटा समाप्त हो गया है। स्थानीय मशीन लर्निंग मॉडल चला रहा हूँ..."
+        }
 
 
 # RUN

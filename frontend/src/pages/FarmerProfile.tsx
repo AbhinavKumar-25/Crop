@@ -10,7 +10,7 @@ import { cropDetails } from '../data/cropData';
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import logo from '../assets/logo.png';
 import farmerBg from '../assets/farmer-field.jpg';
-
+import VoiceChat from '../components/VoiceChat';
 
 import paddyImg from '../assets/crops/paddy.jpg';
 import wheatImg from '../assets/crops/wheat.jpg';
@@ -194,7 +194,11 @@ const FarmerProfile: React.FC = () => {
 
   const [districts, setDistricts] = useState<District[]>([]);
   const [selectedDistrict, setSelectedDistrict] = useState('');
+  const [targetCrop, setTargetCrop] = useState('');
+  const [landSize, setLandSize] = useState<number | ''>(1);
+  const [startDate, setStartDate] = useState('');
   const [loading, setLoading] = useState(false);
+  const [customLoading, setCustomLoading] = useState(false);
   const [result, setResult] = useState<PredictionResult | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [accuracy, setAccuracy] = useState<number | null>(null);
@@ -257,22 +261,35 @@ const FarmerProfile: React.FC = () => {
       if (data) {
         setResult(data);
       } else {
-        // Handle case where API returns empty but doesn't throw error
         throw new Error("Empty response");
       }
-
     } catch (error) {
       console.error("Prediction error:", error);
-
-      // 2. Show error message instead of going blank
       const errorMsg = language === 'hi'
         ? 'क्षमा करें, सर्वर से डेटा प्राप्त करने में विफल।'
         : 'Sorry, failed to fetch data from the server. Please try again.';
-
       alert(errorMsg);
     } finally {
-      // 3. Always turn off loading, even if it fails
       setLoading(false);
+    }
+  };
+
+  const handleCustomPredict = async () => {
+    if (!selectedDistrict || !targetCrop) return;
+    if (!navigator.onLine) {
+      const offlineMsg = language === 'hi' ? 'इंटरनेट कनेक्शन नहीं है!' : 'No internet connection!';
+      alert(offlineMsg);
+      return;
+    }
+    setCustomLoading(true);
+    try {
+      const data = await predictCrop(selectedDistrict, targetCrop, landSize === '' ? undefined : landSize, startDate);
+      if (data) setResult(data);
+    } catch (error) {
+      console.error("Prediction error:", error);
+      alert("Error generating custom plan.");
+    } finally {
+      setCustomLoading(false);
     }
   };
 
@@ -372,24 +389,28 @@ const FarmerProfile: React.FC = () => {
           </p>
         </div>
 
-        {/* INPUT CARD */}
+        {/* INITIAL INPUT CARD */}
         <div className="w-full bg-white/90 backdrop-blur-md p-6 sm:p-8 rounded-[2.5rem] shadow-sm border border-white/20">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <MapPin size={14} className="text-green-600" />
-            {language === 'hi' ? 'अपना जिला चुनें' : 'Choose District'}
-          </label>
-          <select
-            value={selectedDistrict}
-            onChange={e => setSelectedDistrict(e.target.value)}
-            className="w-full p-4 border border-slate-100 rounded-2xl bg-slate-50 text-sm font-bold outline-none focus:ring-4 focus:ring-green-500/10 appearance-none transition-all"
-          >
-            <option value="">-- {language === 'hi' ? 'जिला चुनें' : 'Select District'} --</option>
-            {districts.map(d => (
-              <option key={d.code} value={d.code}>
-                {language === 'hi' ? d.nameHi : d.name}
-              </option>
-            ))}
-          </select>
+          <div className="flex flex-col gap-4">
+            <div>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center justify-center gap-2">
+                <MapPin size={14} className="text-green-600" />
+                {language === 'hi' ? 'अपना जिला चुनें' : 'Choose District'}
+              </label>
+              <select
+                value={selectedDistrict}
+                onChange={e => setSelectedDistrict(e.target.value)}
+                className="w-full p-4 border border-slate-100 rounded-2xl bg-slate-50 text-base text-center font-black outline-none focus:ring-4 focus:ring-green-500/10 appearance-none transition-all"
+              >
+                <option value="">-- {language === 'hi' ? 'जिला चुनें' : 'Select District'} --</option>
+                {districts.map(d => (
+                  <option key={d.code} value={d.code}>
+                    {language === 'hi' ? d.nameHi : d.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           <button
             onClick={handlePredict}
             // Button is disabled if: No district selected OR currently loading OR offline
@@ -457,7 +478,7 @@ const FarmerProfile: React.FC = () => {
                       {result.crop.aiGenerated && (
                         <div className="mt-3 flex items-center gap-1 opacity-80">
                           <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-full shadow-sm">
-                            Powered by Gemini AI ✦
+                            Powered by Groq ✦
                           </span>
                         </div>
                       )}
@@ -469,6 +490,8 @@ const FarmerProfile: React.FC = () => {
                       {isSpeaking ? <Activity size={22} /> : <Volume2 size={22} />}
                     </button>
                   </div>
+
+
 
                   {/* Pros & Challenges */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -561,10 +584,10 @@ const FarmerProfile: React.FC = () => {
                   {language === 'hi' ? 'AI सटीकता और फसल उपयुक्तता' : 'AI Accuracy & Crop Suitability'}
                 </h4>
 
-                {/* Accuracy only (Crop suitability removed) */}
-                <div className="flex flex-col sm:flex-row items-center justify-around gap-8 mb-8">
+                {/* Accuracy & Crop suitability */}
+                <div className="flex flex-col sm:flex-row items-start justify-between gap-8 mb-8">
                   {/* Model Accuracy */}
-                  <div className="flex flex-col items-center gap-3">
+                  <div className="flex flex-col items-center justify-center gap-3 bg-white p-4 rounded-3xl border border-slate-100 shadow-sm w-full sm:w-1/3">
                     <AccuracyRing pct={accuracy ?? 92} />
                     <div className="text-center">
                       <p className="text-xs font-black text-slate-700">
@@ -575,7 +598,45 @@ const FarmerProfile: React.FC = () => {
                       </p>
                     </div>
                   </div>
+
+                  {/* Confidence Scores List */}
+                  {result.confScores && result.confScores.length > 0 && (
+                    <div className="flex-1 w-full bg-slate-50 p-5 rounded-3xl border border-slate-100">
+                       <h5 className="text-[10px] uppercase font-black text-slate-500 mb-3">
+                         {language === 'hi' ? 'अन्य फसलों की संभावना' : 'Alternative Crops Probability'}
+                       </h5>
+                       <div className="space-y-3">
+                         {result.confScores.slice(0, 4).map((c, idx) => (
+                           <div key={idx} className="flex items-center justify-between">
+                             <span className="text-xs font-bold text-slate-700 w-16">{c.crop}</span>
+                             <div className="flex-1 mx-4 h-2 bg-slate-200 rounded-full overflow-hidden">
+                               <div className={`h-full ${idx === 0 ? 'bg-green-500' : 'bg-blue-400'}`} style={{ width: `${c.prob * 100}%` }}></div>
+                             </div>
+                             <span className="text-xs font-black text-slate-500 w-10 text-right">{Math.round(c.prob * 100)}%</span>
+                           </div>
+                         ))}
+                       </div>
+                    </div>
+                  )}
                 </div>
+                
+                {/* Worst Case Scenario */}
+                {result.worstCrop && (
+                  <div className="bg-red-50 p-5 rounded-3xl border border-red-100 mb-6 flex items-center justify-between">
+                     <div>
+                        <h4 className="text-red-800 font-black text-[12px] uppercase tracking-widest mb-1 flex items-center gap-2">
+                           <AlertCircle size={14} />
+                           {language === 'hi' ? 'सबसे खराब विकल्प' : 'Worst Case Scenario'}
+                        </h4>
+                        <p className="text-red-600 text-xs font-bold">
+                           {language === 'hi' ? `इस मिट्टी में ${result.worstCrop} की संभावना सबसे कम है।` : `${result.worstCrop} has the lowest probability of success in this soil.`}
+                        </p>
+                     </div>
+                     <div className="text-lg font-black text-red-500 bg-red-100 px-4 py-2 rounded-2xl border border-red-200">
+                        {result.worstCrop}
+                     </div>
+                  </div>
+                )}
 
                 {/* Detailed crop info card */}
                 {stats && (
@@ -636,6 +697,147 @@ const FarmerProfile: React.FC = () => {
                   ))}
                 </div>
               </div>
+
+              {/* PHASE 3: CUSTOM TARGET CROP PLAYGROUND */}
+              <div className="bg-white/90 backdrop-blur-md p-6 sm:p-8 rounded-[2.5rem] shadow-sm border border-white/20 mt-8">
+                  <div className="mb-6">
+                     <h3 className="text-lg font-black text-slate-800 flex items-center gap-2"><Sprout className="text-green-600"/> {language === 'hi' ? 'एक कस्टम फसल योजना बनाएं' : 'Plan a Custom Crop'}</h3>
+                     <p className="text-[11px] font-bold text-slate-400 mt-1">{language === 'hi' ? 'चुनें कि आप क्या उगाना चाहते हैं और हम उसी अनुसार रणनीति बनाएंगे:' : 'Choose what you want to grow and we will tailor a strategy:'}</p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <Sprout size={14} className="text-green-600" />
+                        {language === 'hi' ? 'फसल चुनें' : 'Select Target Crop'}
+                      </label>
+                      <select
+                        value={targetCrop}
+                        onChange={e => setTargetCrop(e.target.value)}
+                        className="w-full p-4 border border-slate-100 rounded-2xl bg-slate-50 text-sm font-bold outline-none focus:ring-4 focus:ring-green-500/10 appearance-none transition-all"
+                      >
+                        <option value="">-- {language === 'hi' ? 'फसल चुनें' : 'Choose Crop'} --</option>
+                        {['Paddy', 'Wheat', 'Maize', 'Pulses', 'Mustard', 'Cotton', 'Sugarcane'].map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <MapPin size={14} className="text-green-600" />
+                        {language === 'hi' ? 'भूमि का आकार (एकड़)' : 'Land Size (Acres)'}
+                      </label>
+                      <input
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        value={landSize}
+                        onChange={e => setLandSize(e.target.value ? parseFloat(e.target.value) : '')}
+                        placeholder="1.0"
+                        className="w-full p-4 border border-slate-100 rounded-2xl bg-slate-50 text-sm font-bold outline-none focus:ring-4 focus:ring-green-500/10 transition-all font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <Sun size={14} className="text-green-600" />
+                        {language === 'hi' ? 'प्रारंभ तिथि' : 'Start Date'}
+                      </label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={e => setStartDate(e.target.value)}
+                        className="w-full p-4 border border-slate-100 rounded-2xl bg-slate-50 text-sm font-bold outline-none focus:ring-4 focus:ring-green-500/10 transition-all font-mono"
+                      />
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={handleCustomPredict}
+                    disabled={!targetCrop || customLoading || !navigator.onLine}
+                    className="w-full mt-6 bg-slate-900 text-white py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-slate-200 flex items-center justify-center gap-3 transition-all active:scale-95 disabled:bg-slate-200 disabled:shadow-none hover:bg-indigo-600"
+                  >
+                    {customLoading ? <Loader2 className="animate-spin" size={16} /> : <Activity size={16} />}
+                    {customLoading
+                      ? (language === 'hi' ? 'विश्लेषण कर रहा है...' : 'Analyzing Target Crop...')
+                      : (language === 'hi' ? 'मेरी कस्टम फसल का विश्लेषण करें' : 'Analyze Custom Crop')
+                    }
+                  </button>
+              </div>
+
+              {/* PHASE 4: TARGET CROP RESULTS */}
+              {result.targetCropDetails && (
+                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-indigo-950 p-6 sm:p-8 rounded-[2.5rem] shadow-xl border border-indigo-500/30 overflow-hidden relative">
+                    <div className="absolute top-0 right-0 opacity-10 scale-150 transform -translate-y-1/2 translate-x-1/4">
+                       <Sprout size={200} />
+                    </div>
+                    <div className="relative z-10">
+                       <div className="flex items-center gap-4 mb-6 pb-6 border-b border-white/10">
+                          <img src={getCropImage(result.targetCropDetails.name)} className="w-16 h-16 rounded-2xl object-cover border-2 border-indigo-400/50 shadow-lg"/>
+                          <div>
+                             <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">{language === 'hi' ? 'लक्षित फसल विश्लेषण' : 'Target Crop Analysis'}</p>
+                             <h2 className="text-3xl font-black text-white">{language === 'hi' ? result.targetCropDetails.nameHi : result.targetCropDetails.name}</h2>
+                          </div>
+                       </div>
+                       
+                       {/* TIMELINE OVERVIEW */}
+                       <div className="bg-black/20 rounded-3xl p-5 border border-white/5 mb-6">
+                           <h4 className="text-[10px] font-black text-white/50 uppercase tracking-widest mb-4 flex items-center gap-2"><Sun size={12}/> {language === 'hi' ? 'खेती की समयरेखा' : 'Cultivation Timeline'}</h4>
+                           <div className="flex items-center justify-between">
+                              <div className="text-center">
+                                 <p className="text-[10px] font-bold text-white/40 uppercase mb-1">{language === 'hi' ? 'शुरू' : 'Start'}</p>
+                                 <p className="text-sm font-black text-white">{result.targetCropDetails.startDate}</p>
+                              </div>
+                              <div className="flex-1 px-4 flex flex-col items-center">
+                                 <p className="text-[10px] font-black text-indigo-300 bg-indigo-500/20 px-3 py-1 rounded-full mb-2">~{result.targetCropDetails.durationDays} {language === 'hi' ? 'दिन' : 'Days'}</p>
+                                 <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden flex items-center">
+                                    <div className="w-full h-full bg-gradient-to-r from-indigo-500 to-green-500"></div>
+                                 </div>
+                              </div>
+                              <div className="text-center">
+                                 <p className="text-[10px] font-bold text-white/40 uppercase mb-1">{language === 'hi' ? 'कटाई' : 'Harvest'}</p>
+                                 <p className="text-sm font-black text-green-400">{result.targetCropDetails.harvestDate}</p>
+                              </div>
+                           </div>
+                       </div>
+
+                       {/* Seasonality Warning */}
+                       {result.targetCropDetails.seasonalityWarning && (
+                         <div className="bg-amber-500/10 border-l-4 border-amber-500 p-4 mb-6 rounded-r-2xl">
+                           <p className="text-amber-200 text-sm font-bold flex items-center gap-2">
+                             <AlertCircle size={16} /> 
+                             {language === 'hi' && result.targetCropDetails.seasonalityWarningHi ? result.targetCropDetails.seasonalityWarningHi : result.targetCropDetails.seasonalityWarning}
+                           </p>
+                         </div>
+                       )}
+
+                       {/* Land & Remediation */}
+                       <div className="space-y-4">
+                           {result.targetCropDetails.landInsightsEn && (
+                             <div className="bg-emerald-900/40 p-5 rounded-3xl border border-emerald-500/20">
+                               <h4 className="text-emerald-400 font-black text-[11px] uppercase tracking-widest mb-2 flex items-center gap-2">
+                                 <Activity size={14} /> {language === 'hi' ? 'संसाधन आवश्यकताएँ' : 'Resource Requirements'}
+                               </h4>
+                               <p className="text-emerald-50 text-sm leading-relaxed">
+                                 {language === 'hi' && result.targetCropDetails.landInsightsHi ? result.targetCropDetails.landInsightsHi : result.targetCropDetails.landInsightsEn}
+                               </p>
+                             </div>
+                           )}
+
+                           {result.targetCropDetails.remediationPlanEn && (
+                             <div className="bg-indigo-900/40 p-5 rounded-3xl border border-indigo-500/20">
+                               <h4 className="text-indigo-300 font-black text-[11px] uppercase tracking-widest mb-3 flex items-center gap-2">
+                                 <TestTube2 size={14} /> {language === 'hi' ? 'मिट्टी सुधार योजना' : 'Soil Remediation Plan'}
+                               </h4>
+                               <p className="text-indigo-50 text-sm leading-relaxed whitespace-pre-wrap">
+                                 {language === 'hi' && result.targetCropDetails.remediationPlanHi ? result.targetCropDetails.remediationPlanHi : result.targetCropDetails.remediationPlanEn}
+                               </p>
+                             </div>
+                           )}
+                       </div>
+                    </div>
+                 </motion.div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -689,6 +891,7 @@ const FarmerProfile: React.FC = () => {
           </div>
         </div>
       </footer>
+      <VoiceChat contextStr={result ? `District: ${selectedDistrict}, Recommended Crop: ${result.crop.name}, Target Crop: ${result.targetCropDetails?.name || 'None'}, N=${result.soil.n}, P=${result.soil.p}, K=${result.soil.k}, pH=${result.soil.ph}, Current Weather: ${result.soil.temp}°C, ${result.soil.hum}%, ${result.soil.rain}mm` : undefined} />
     </div>
 
   );
