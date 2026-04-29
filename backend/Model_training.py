@@ -6,17 +6,10 @@ import pandas as pd
 # Reading Crops Data of State Jharkhand collected from various platforms
 
 crop_data = pd.read_csv("jharkhand_crop_dataset.csv")
-
 crop_data.head(5)
-
 crop_data.info()
-
-# No need of cleaning already, data is cleaned
-
 crop_data.describe()
-
 crop_data = crop_data.drop(columns=['District'])
-
 crops_data_num = crop_data.select_dtypes(include=np.number)
 
 import seaborn as sns

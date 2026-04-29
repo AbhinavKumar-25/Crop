@@ -22,7 +22,7 @@ app = FastAPI(title="AgriAI Crop Advisor", version="1.0.0")
 # Allow React frontend to talk to this backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace with your frontend URL in production
+    allow_origins=["https://crop-advisor-two.vercel.app/"],  # Replace with your frontend URL in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -473,6 +473,13 @@ Provide a STEP-BY-STEP soil remediation plan. Explain how they can improve their
                 prompt += "Leave the target fields as empty strings.\n"
 
             prompt += f"""
+Current Condition Context: 
+- Confidence Score for {crop_name}: {confidence * 100:.1f}% 
+- Worst predicted crop for this soil: {worst_crop}
+- Rainfall: {rain} mm
+- Temperature: {temp} °C
+- Soil: N: {soil['N']}, P: {soil['P']}, K: {soil['K']}, pH: {soil['pH']}
+
 Return EXACTLY a JSON object with this format, NO markdown, NO code block ticks.
 {{
   "descriptionEn": "2 to 3 lines describing why {crop_name} thrives and uses.",
@@ -485,8 +492,10 @@ Return EXACTLY a JSON object with this format, NO markdown, NO code block ticks.
   "prosHi": ["फ़ायदा 1", "फ़ायदा 2", "फ़ायदा 3"],
   "consEn": ["challenge 1", "challenge 2", "challenge 3"],
   "consHi": ["चुनौती 1", "चुनौती 2", "चुनौती 3"],
-  "watchOutEn": "1 sentence on a key disease or pest to watch out for. Include WORST CASE scenario.",
+  "watchOutEn": "1 sentence on a key disease or pest to watch out for.",
   "watchOutHi": "Hindi translation of the watch out warning.",
+  "advisoryEn": "Dynamic Risk Advisory: If rainfall is heavy (>10mm), give precautions. If Confidence Score is low (<90%), give steps to improve the soil to push confidence above 90% for {crop_name}. Else, mention worst case scenario '{worst_crop}' risk.",
+  "advisoryHi": "Hindi translation of advisoryEn. Avoid using markdown formatting.",
   "targetLandInsightsEn": "1 sentence describing seed/fertilizer volume required for {target_crop} on {land_size_acres} acres.",
   "targetLandInsightsHi": "Hindi translation.",
   "targetRemediationPlanEn": "Step-by-step string on how to prep the soil for {target_crop}. Use '\\n' for new lines.",
@@ -547,6 +556,9 @@ Return EXACTLY a JSON object with this format, NO markdown, NO code block ticks.
 
     watch_out_en = extended_ai_data.get("watchOutEn", "Consult local guidelines for pest control.") if extended_ai_data else "Consult local guidelines for pest control."
     watch_out_hi = extended_ai_data.get("watchOutHi", "कीट नियंत्रण के लिए स्थानीय कृषि दिशानिर्देशों का पालन करें।") if extended_ai_data else "कीट नियंत्रण के लिए स्थानीय कृषि दिशानिर्देशों का पालन करें।"
+    
+    advisory_en = extended_ai_data.get("advisoryEn", f"The crop '{worst_crop}' has the lowest probability of success in this district.") if extended_ai_data else f"The crop '{worst_crop}' has the lowest probability of success in this district."
+    advisory_hi = extended_ai_data.get("advisoryHi", f"इस मिट्टी में '{worst_crop}' की सफलता की संभावना सबसे कम है।") if extended_ai_data else f"इस मिट्टी में '{worst_crop}' की सफलता की संभावना सबसे कम है।"
 
     final_result = {
         "crop": {
@@ -565,6 +577,8 @@ Return EXACTLY a JSON object with this format, NO markdown, NO code block ticks.
             "consHi":        cons_hi,
             "watchOutEn":    watch_out_en,
             "watchOutHi":    watch_out_hi,
+            "advisoryEn":    advisory_en,
+            "advisoryHi":    advisory_hi,
             "imageUrl":      info["imageUrl"],
             "durationDays":  info.get("durationDays", 90),
         },

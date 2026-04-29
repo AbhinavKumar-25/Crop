@@ -12,9 +12,9 @@ const translations: Record<Language, Record<string, string>> = {
   en: {
     'app.title': 'Jharkhand Crop Advisor',
     'profile.selection': 'Choose Your Profile',
-    'profile.farmer': 'Farmer Profile',
+    'profile.farmer': 'Farmer',
     'profile.farmer.desc': 'Hindi language support with audio assistance',
-    'profile.pro': 'Professional Profile',
+    'profile.pro': 'Dashboard',
     'profile.pro.desc': 'Detailed charts, maps, and multilingual support',
     'select.district': 'Select Your District',
     'predict.btn': 'Get Recommendation',
@@ -35,9 +35,9 @@ const translations: Record<Language, Record<string, string>> = {
   hi: {
     'app.title': 'झारखंड फसल सलाहकार',
     'profile.selection': 'अपना प्रोफाइल चुनें',
-    'profile.farmer': 'किसान प्रोफाइल',
+    'profile.farmer': 'किसान',
     'profile.farmer.desc': 'ऑडियो सहायता के साथ हिंदी भाषा समर्थन',
-    'profile.pro': 'प्रोफेशनल प्रोफाइल',
+    'profile.pro': 'नियंत्रण-पट्ट',
     'profile.pro.desc': 'विस्तृत चार्ट, मानचित्र और बहुभाषी समर्थन',
     'select.district': 'अपना जिला चुनें',
     'predict.btn': 'फसल की सलाह लें',

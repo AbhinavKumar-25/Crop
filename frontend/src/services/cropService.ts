@@ -12,6 +12,8 @@ export interface PredictionResult {
     sloganHi?: string;
     watchOutEn?: string;
     watchOutHi?: string;
+    advisoryEn?: string;
+    advisoryHi?: string;
     waterNeeded?: number;
     daysToHarvest?: number;
     maintenance: string;

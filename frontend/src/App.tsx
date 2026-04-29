@@ -1,8 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { LanguageProvider } from './context/LanguageContext';
 import LandingPage from './pages/LandingPage';
-import FarmerProfile from './pages/FarmerProfile';
-import ProfessionalProfile from './pages/ProfessionalProfile';
+import PredictionPage from './pages/PredictionPage';
 
 function App() {
   return (
@@ -10,8 +9,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/farmer" element={<FarmerProfile />} />
-          <Route path="/pro" element={<ProfessionalProfile />} />
+          <Route path="/prediction" element={<PredictionPage />} />
         </Routes>
       </Router>
     </LanguageProvider>
