@@ -22,7 +22,7 @@ app = FastAPI(title="AgriAI Crop Advisor", version="1.0.0")
 # Allow React frontend to talk to this backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://crop-advisor-two.vercel.app/"],  # Replace with your frontend URL in production
+    allow_origins=["*"],  # Replace with your frontend URL in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
