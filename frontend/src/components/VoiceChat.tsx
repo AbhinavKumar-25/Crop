@@ -167,7 +167,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ contextStr }) => {
                   {isListening && <span className="absolute inset-0 rounded-full border-2 border-[#788F6A]/50 animate-ping pointer-events-none"></span>}
                 </div>
                 <div>
-                  <h3 className="text-white font-black text-sm tracking-wide">{language === 'hi' ? 'एग्री-एआई' : 'AGRI-AI'}</h3>
+                  <h3 className="text-white font-black text-sm tracking-wide">{language === 'hi' ? 'एग्रो-माईन्ड' : 'AGRO-MIND'}</h3>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#A3C491] animate-pulse"></span>
                     <p className="text-stone-200 text-[9px] font-black uppercase tracking-[0.2em]">{language === 'hi' ? 'संचालित: Groq' : 'Powered by Groq'}</p>
@@ -201,8 +201,8 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ contextStr }) => {
                 >
                   <div className="max-w-[85%] whitespace-pre-wrap rounded-[1.5rem] px-5 py-3.5 text-[13px] leading-relaxed shadow-lg bg-[#F4F6F2] text-[#3B4834] border border-[#E1E8DB] rounded-bl-sm">
                     {language === 'hi'
-                      ? 'एग्री-एआई में आपका स्वागत है! 👋 मैं आपकी मदद के लिए यहाँ हूँ:\n- मिट्टी का विश्लेषण करने में 🧪\n- मौसम की जानकारी देने में 🌤️\n- सबसे अच्छी फसल चुनने में 🌱\n\nक्या आप आज मिलकर कुछ शानदार उगाने के लिए तैयार हैं? 🚜'
-                      : 'Welcome to AGRI-AI! 👋 I\'m here to help you to:\n- Analyze your soil 🧪\n- Check the weather 🌤️\n- Choose the best crop 🌱\n\nReady to grow something amazing together today? 🚜'}
+                      ? 'एग्रो-माईंड में आपका स्वागत है! 👋 मैं आपकी मदद के लिए यहाँ हूँ:\n- मिट्टी का विश्लेषण करने में 🧪\n- मौसम की जानकारी देने में 🌤️\n- सबसे अच्छी फसल चुनने में 🌱\n\nक्या आप आज मिलकर कुछ शानदार उगाने के लिए तैयार हैं? 🚜'
+                      : 'Welcome to AGRO-MIND! 👋 I\'m here to help you to:\n- Analyze your soil 🧪\n- Check the weather 🌤️\n- Choose the best crop 🌱\n\nReady to grow something amazing together today? 🚜'}
                   </div>
                 </motion.div>
               )}
@@ -265,9 +265,6 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ contextStr }) => {
                   <Send size={16} strokeWidth={2.5} />
                 </button>
               </div>
-              <p className="text-[10px] text-center text-[#3B4834]/40 font-medium px-2">
-                {language === 'hi' ? 'एग्री-एआई गलतियाँ कर सकता है।' : 'AGRI-AI can make mistakes.'}
-              </p>
             </div>
           </motion.div>
         )}

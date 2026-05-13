@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
    ArrowLeft, Volume2, MapPin, Loader2, WifiOff, CloudRain, Sun, Sprout,
-   Droplets, CloudSun, TestTube2, Activity, AlertCircle, Eye,
-   BarChart3, Thermometer, Wind, Calendar, Info
+   Droplets, CloudSun, TestTube2, Activity, AlertCircle
 } from 'lucide-react';
 import {
    PieChart, Pie, Cell, ResponsiveContainer,
@@ -11,7 +10,7 @@ import {
    Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
 } from 'recharts';
 import { useLanguage } from '../context/LanguageContext';
-import { speakText, getDistricts, predictCrop, getAccuracy, District, PredictionResult } from '../services/cropService';
+import { getDistricts, predictCrop, getAccuracy, District, PredictionResult } from '../services/cropService';
 import { motion, AnimatePresence } from 'framer-motion';
 import logo from '../assets/logo.png';
 import backgroundVideo from '../assets/backgroundvideo.mp4';
@@ -118,6 +117,7 @@ const PredictionPage: React.FC = () => {
    const [result, setResult] = useState<PredictionResult | null>(null);
    const [isSpeaking, setIsSpeaking] = useState(false);
    const [accuracy, setAccuracy] = useState<number | null>(null);
+   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
    // RESTRICT PAST DATES
    const todayDate = new Date().toISOString().split('T')[0];
@@ -129,6 +129,15 @@ const PredictionPage: React.FC = () => {
          const raw = d.accuracy ?? d.test_accuracy ?? d.score ?? 0.94;
          setAccuracy(Math.round(raw * 100));
       });
+
+      const handleOnline = () => setIsOffline(false);
+      const handleOffline = () => setIsOffline(true);
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+      return () => {
+         window.removeEventListener('online', handleOnline);
+         window.removeEventListener('offline', handleOffline);
+      };
    }, []);
 
    const handlePredict = async () => {
@@ -173,6 +182,17 @@ const PredictionPage: React.FC = () => {
    return (
       <div className="min-h-screen flex flex-col relative overflow-hidden">
          <FarmerBackground />
+         <AnimatePresence>
+            {isOffline && (
+               <motion.div
+                  initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -50 }}
+                  className="fixed top-0 left-0 right-0 z-[100] bg-rose-600/90 backdrop-blur-md text-white py-2 px-4 flex items-center justify-center gap-2 text-sm font-bold shadow-lg"
+               >
+                  <WifiOff size={16} />
+                  {language === 'hi' ? 'आप ऑफ़लाइन हैं। कृपया इंटरनेट की जांच करें।' : 'You are offline. Please check your connection.'}
+               </motion.div>
+            )}
+         </AnimatePresence>
 
          <motion.header
             initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
@@ -191,8 +211,8 @@ const PredictionPage: React.FC = () => {
                         <img src={logo} alt="Logo" className="w-full h-full object-cover" />
                      </motion.div>
                      <div>
-                        <h1 className="text-lg font-black text-white leading-none tracking-tight">AGRI<span className="text-green-500">AI</span></h1>
-                        <p className="text-[8px] font-bold text-white/40 uppercase tracking-[0.3em]">Jharkhand</p>
+                        <h1 className="text-lg font-black text-white leading-none tracking-tight">AGRO<span className="text-green-500">MIND</span></h1>
+                        <p className="text-[11px] font-bold text-white/40 uppercase tracking-[0.3em]">Jharkhand</p>
                      </div>
                   </div>
                </div>
@@ -494,8 +514,7 @@ const PredictionPage: React.FC = () => {
          </main>
 
          <footer className="absolute bottom-4 inset-x-0 z-30 flex flex-col items-center text-gray-400 text-[10px] sm:text-[12px] font-bold tracking-[0.1em] uppercase opacity-60 text-center gap-1">
-            <span>Jharkhand Crop Advisor | © 2026 AGRI-AI</span>
-            <span className="normal-case tracking-normal text-[10px]">AGRIAI CAN MAKE MISTAKES.</span>
+            <span>Jharkhand Crop Advisor | © 2026 AGRO-MIND</span>
          </footer>
 
          <div className="fixed bottom-8 right-8 z-[100]"><VoiceChat /></div>

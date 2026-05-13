@@ -22,7 +22,7 @@ app = FastAPI(title="AgriAI Crop Advisor", version="1.0.0")
 # Allow React frontend to talk to this backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace with your frontend URL in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -622,7 +622,7 @@ Always greet the user warmly if it's the start of the conversation.
 
 YOUR STRICT RULES:
 1. When asked to predict a crop or check crop viability, ALWAYS use the `get_ml_crop_prediction` tool. If you do not know the district, ASK the user which district they are farming in first. Do not make assumptions.
-2. If predicting a crop, ALWAYS include a markdown hyperlink exactly formatted as: `[Click here for Full Prediction Dashboard](/farmer)`. Do NOT use standard html tags.
+2. If predicting a crop, ALWAYS include a markdown hyperlink exactly formatted as: `[Visit Dashboard for Full Prediction](/prediction)`. Do NOT use standard html tags.
 3. If the user asks if a specific crop like "Wheat" is good instead of the predicted one, use the `get_ml_crop_prediction` tool providing specific_crop="Wheat". If confidence is low, explain why and contrast it with the recommended one.
 4. Correct spelling automatically. Keep responses conversational, empathetic, and extremely concise (Swiggy chat style).
 5. If the user asks how long a crop takes to grow, use `fetch_crop_details` tool.
@@ -735,7 +735,7 @@ DASHBOARD STATE: {context}
             fallback_dist = dist_match.group(1).strip() if dist_match else "Ranchi"
         try:
             local_ans = get_ml_crop_prediction(fallback_dist)
-            fallback_msg += f"Running local Machine Learning model directly: {local_ans} [Click here for Full Prediction Dashboard](/farmer)"
+            fallback_msg += f"Running local Machine Learning model directly: {local_ans} [Prediction Dashboard](/prediction)"
         except Exception:
             fallback_msg += "Local fallback failed."
         return {

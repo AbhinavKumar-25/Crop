@@ -1,22 +1,21 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Briefcase, User, Globe } from 'lucide-react';
+import { Globe } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import { motion } from 'framer-motion';
 import logo from '../assets/logo.png';
 import backgroundVideo from "../assets/backgroundvideo.mp4";
 import VoiceChat from '../components/VoiceChat';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
-  const { t, setLanguage, language } = useLanguage();
+  const { setLanguage, language } = useLanguage();
 
 
 
   return (
     <div className="relative min-h-screen overflow-hidden flex flex-col items-center justify-center p-4 bg-[#0a0d0a]">
 
-      {/* UPDATED BACKGROUND LAYER */}
       <div className="absolute inset-0 z-0 overflow-hidden">
         <video
           autoPlay
@@ -64,9 +63,9 @@ const LandingPage: React.FC = () => {
 
           <div className="flex flex-col">
             <span className="text-white font-black tracking-tighter text-xl leading-none hidden sm:block">
-              AGRI<span className="text-green-500">AI</span>
+              AGRO<span className="text-green-500">MIND</span>
             </span>
-            <span className="text-[8px] font-bold text-white/30 uppercase tracking-[0.3em] hidden sm:block">
+            <span className="text-[12px] font-bold text-white/30 uppercase tracking-[0.3em] hidden sm:block">
               Jharkhand
             </span>
           </div>
@@ -129,7 +128,7 @@ const LandingPage: React.FC = () => {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => { navigate('/prediction'); }}
-            className="bg-[#10b981] hover:bg-[#059669] text-white px-8 py-3 rounded-full font-bold text-sm md:text-base shadow-lg hover:shadow-green-500/50 transition-all flex items-center justify-center gap-2"
+            className="bg-[#4A5A41] hover:bg-[#5E7153] text-white px-8 py-3 rounded-full font-bold text-sm md:text-base shadow-lg hover:shadow-[#4A5A41/50] transition-all flex items-center justify-center gap-2"
           >
             {language === 'hi' ? 'शुरू करें →' : 'Get Started →'}
           </motion.button>
@@ -138,8 +137,7 @@ const LandingPage: React.FC = () => {
       </div>
 
       <footer className="absolute bottom-4 inset-x-0 z-30 flex flex-col items-center text-gray-400 text-[10px] sm:text-[12px] font-bold tracking-[0.1em] uppercase opacity-60 text-center gap-1">
-        <span>Jharkhand Crop Advisor | © 2026 AGRI-AI</span>
-        <span className="normal-case tracking-normal text-[10px]">AGRIAI CAN MAKE MISTAKES.</span>
+        <span>Jharkhand Crop Advisor | © 2026 AGRO-MIND</span>
       </footer>
       <VoiceChat />
     </div>
