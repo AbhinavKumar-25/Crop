@@ -96,7 +96,7 @@ const SuitabilityRadar: React.FC<{ data: any }> = ({ data }) => (
 
 const FarmerBackground: React.FC = () => (
    <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-      <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'blur(4px) brightness(1) saturate(1)' }}>
+      <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'brightness(1) saturate(1)' }}>
          <source src={backgroundVideo} type="video/mp4" />
       </video>
       <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, hsla(30, 20%, 10%, 0.4) 0%, hsla(142, 30%, 8%, 0.6) 60%, hsla(25, 25%, 8%, 0.8) 100%)" }} />
@@ -319,11 +319,11 @@ const PredictionPage: React.FC = () => {
                </div>
             </section>
 
-            {/* SECTION 2: PROFESSIONAL ANALYTICS HUB */}
+            {/* SECTION 2: ANALYTICS HUB */}
             {result && (
                <section className="space-y-8">
                   <div className="flex items-center justify-between px-4">
-                     <h2 className="text-3xl font-black text-white flex items-center gap-4"><Activity className="text-green-400" /> {language === 'hi' ? 'प्रोफेशनल एनालिटिक्स हब' : 'Professional Analytics Hub'}</h2>
+                     <h2 className="text-3xl font-black text-white flex items-center gap-4"><Activity className="text-green-400" /> {language === 'hi' ? 'प्रोफेशनल एनालिटिक्स हब' : 'Analytics Hub'}</h2>
                      <div className="px-6 py-2 bg-white/10 rounded-full border border-white/20"><p className="text-[10px] font-black text-white/60 uppercase tracking-widest">Conf: {accuracy}%</p></div>
                   </div>
 

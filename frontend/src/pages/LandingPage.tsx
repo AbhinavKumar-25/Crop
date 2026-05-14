@@ -24,7 +24,7 @@ const LandingPage: React.FC = () => {
           playsInline
           className="absolute inset-0 w-full h-full object-cover"
           style={{
-            filter: "blur(2px) brightness(1) saturate(1)",
+            filter: "brightness(1) saturate(1)",
           }}
         >
           <source src={backgroundVideo} type="video/mp4" />

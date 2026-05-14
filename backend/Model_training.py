@@ -228,6 +228,19 @@ accuracy_details = {
 joblib.dump(accuracy_details, "accuracy.pkl")
 print("accuracy.pkl saved!")
 
+# ── Print Accuracy Report ──────────────────────────────────────────────────
+print("\n" + "="*62)
+print("          MODEL ACCURACY REPORT — AgroMind")
+print("="*62)
+print(f"{'Model':<28} {'Accuracy':>9} {'Precision':>10} {'Recall':>8} {'F1 Score':>10}")
+print("-"*62)
+print(f"{'Logistic Regression':<28} {acc_lr:>8.2f}% {pre_lr:>9.2f}% {recall_lr:>7.2f}% {f1_lr/100:>10.4f}")
+print(f"{'Random Forest Classifier':<28} {acc_rf:>8.2f}% {pre_rf:>9.2f}% {recall_rf:>7.2f}% {f1_rf/100:>10.4f}")
+print(f"{'XGBoost':<28} {acc_xgb:>8.2f}% {pre_xgb:>9.2f}% {recall_xgb:>7.2f}% {f1_xgb/100:>10.4f}")
+print("-"*62)
+print(f"  ✅ Best Model Selected : {best_model_name}")
+print("="*62 + "\n")
+
 # Crop Recommendation
 crop_data.columns
 
